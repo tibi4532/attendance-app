@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>勤怠打刻</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#2f6f5e">
+<link rel="icon" href="icon-192.png">
+<style>
+  html,body{ margin:0; padding:0; }
+  #attendance-app, #attendance-app * { box-sizing: border-box; }
+  :root{
+    --ink:#1c2b2d; --paper:#f6f4ee; --card:#ffffff; --line:#dfd9c9;
+    --accent:#2f6f5e; --accent-deep:#1f4f42; --warn:#b5482f; --muted:#6b7573;
+  }
+  #attendance-app{
+    font-family: "Hiragino Sans","Yu Gothic UI","Noto Sans JP",system-ui,sans-serif;
+    background: var(--paper); color: var(--ink); min-height: 100vh; -webkit-tap-highlight-color: transparent;
+  }
+  .aa-header{ display:flex; align-items:center; justify-content:space-between; padding: 22px 28px 18px; border-bottom: 1px solid var(--line); }
+  .aa-brand{ display:flex; flex-direction:column; gap:2px; }
+  .aa-brand .eyebrow{ font-size:12px; letter-spacing:.14em; color:var(--muted); }
+  .aa-brand h1{ margin:0; font-size:22px; font-weight:700; }
+  .aa-clock{ text-align:right; }
+  .aa-clock .time{ font-size:34px; font-weight:700; font-variant-numeric: tabular-nums; color:var(--accent-deep); line-height:1; }
+  .aa-clock .date{ font-size:13px; color:var(--muted); margin-top:4px; }
+  .aa-grid{ display:grid; grid-template-columns: repeat(auto-fill, minmax(160px,1fr)); gap: 16px; padding: 24px 28px 100px; }
+  .aa-tile{ background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 22px 14px; text-align:center; cursor:pointer; min-height: 108px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; }
+  .aa-tile:active{ transform: scale(.97); }
+  .aa-tile .name{ font-size:18px; font-weight:700; }
+  .aa-tile .status{ font-size:12px; padding:3px 10px; border-radius:100px; font-weight:600; }
+  .aa-tile .status.out{ background:#eee9db; color:var(--muted); }
+  .aa-tile .status.in{ background: rgba(47,111,94,.12); color: var(--accent-deep); }
+  .aa-empty{ padding: 60px 20px; text-align:center; color:var(--muted); }
+  .aa-fab{ position: fixed; right: 22px; bottom: 22px; width: 52px; height:52px; border-radius:50%; background: var(--card); border:1px solid var(--line); display:flex; align-items:center; justify-content:center; font-size:22px; cursor:pointer; color:var(--muted); }
+  .aa-overlay{ position: fixed; inset:0; background: rgba(28,43,45,.45); display:flex; align-items:center; justify-content:center; padding:20px; z-index:50; }
+  .aa-modal{ background: var(--card); border-radius:16px; padding:28px; width:100%; max-width:420px; max-height:86vh; overflow:auto; }
+  .aa-modal.wide{ max-width:760px; }
+  .aa-modal h2{ margin:0 0 4px; font-size:20px; }
+  .aa-modal .sub{ color:var(--muted); font-size:13px; margin-bottom:18px; }
+  .aa-btn{ display:block; width:100%; padding:16px; border-radius:10px; border:none; font-size:17px; font-weight:700; cursor:pointer; margin-top:10px; }
+  .aa-btn.primary{ background: var(--accent); color:#fff; }
+  .aa-btn.primary.out{ background: var(--warn); }
+  .aa-btn.ghost{ background: transparent; border:1px solid var(--line); color:var(--ink); }
+  .aa-btn.small{ padding:10px 14px; font-size:14px; width:auto; display:inline-block; margin:6px 6px 0 0; }
+  .aa-row{ display:flex; gap:8px; align-items:center; }
+  .aa-input{ width:100%; padding:12px 14px; border-radius:8px; border:1px solid var(--line); font-size:15px; background:#fbfaf6; margin-top:6px; }
+  .aa-label{ font-size:12px; color:var(--muted); margin-top:14px; display:block; }
+  .aa-tabs{ display:flex; gap:6px; margin-bottom:16px; border-bottom:1px solid var(--line); }
+  .aa-tab{ padding:10px 14px; cursor:pointer; font-size:14px; color:var(--muted); border-bottom:2px solid transparent; }
+  .aa-tab.active{ color:var(--accent-deep); border-color:var(--accent-deep); font-weight:700; }
+  .aa-list-item{ display:flex; align-items:center; justify-content:space-between; padding:10px 0; border-bottom:1px solid var(--line); }
+  .aa-list-item .lbl{ font-weight:600; }
+  table.aa-table{ width:100%; border-collapse:collapse; font-size:13px; }
+  table.aa-table th, table.aa-table td{ padding:8px 6px; border-bottom:1px solid var(--line); text-align:left; white-space:nowrap; }
+  table.aa-table th{ color:var(--muted); font-weight:600; }
+  .aa-del{ color:var(--warn); cursor:pointer; font-size:12px; }
+  .aa-toast{ position:fixed; left:50%; bottom:28px; transform:translateX(-50%); background: var(--accent-deep); color:#fff; padding:14px 22px; border-radius:10px; font-size:15px; font-weight:600; z-index:80; box-shadow:0 8px 20px rgba(0,0,0,.2); }
+  .aa-err{ color:var(--warn); font-size:13px; margin-top:8px; min-height:16px; }
+  .aa-filterbar{ display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap; }
+  .aa-filterbar select{ padding:8px 10px; border-radius:8px; border:1px solid var(--line); background:#fbfaf6; }
+</style>
+</head>
+<body>
+<div id="attendance-app"></div>
+<script>
+(function(){
+  const root = document.getElementById('attendance-app');
+  const KEY_EMP = 'aa_employees';
+  const KEY_REC = 'aa_records';
+  const KEY_PIN = 'aa_pin';
+  const STORE = { employees: [], records: [], pin: '0000' };
+  let state = { modal: null, adminAuthed:false, adminTab:'employees', selectedEmployee:null, filterMonth:null, filterEmp:'all' };
+
+  function loadAll(){
+    try{ STORE.employees = JSON.parse(localStorage.getItem(KEY_EMP) || '[]'); }catch(e){ STORE.employees = []; }
+    try{ STORE.records = JSON.parse(localStorage.getItem(KEY_REC) || '[]'); }catch(e){ STORE.records = []; }
+    STORE.pin = localStorage.getItem(KEY_PIN) || '0000';
+    render();
+  }
+  function saveEmployees(){ localStorage.setItem(KEY_EMP, JSON.stringify(STORE.employees)); }
+  function saveRecords(){ localStorage.setItem(KEY_REC, JSON.stringify(STORE.records)); }
+  function savePin(){ localStorage.setItem(KEY_PIN, STORE.pin); }
+
+  function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+  function pad(n){ return n.toString().padStart(2,'0'); }
+  function fmtTime(d){ return pad(d.getHours())+':'+pad(d.getMinutes()); }
+  function fmtDate(d){ return d.getFullYear()+'年'+pad(d.getMonth()+1)+'月'+pad(d.getDate())+'日'; }
+  function fmtDateShort(d){ return (d.getMonth()+1)+'/'+d.getDate(); }
+  function weekday(d){ return ['日','月','火','水','木','金','土'][d.getDay()]; }
+
+  function lastRecordFor(empId){
+    const list = STORE.records.filter(r=>r.employeeId===empId).sort((a,b)=> b.timestamp.localeCompare(a.timestamp));
+    return list[0] || null;
+  }
+  function nextTypeFor(empId){
+    const last = lastRecordFor(empId);
+    return (!last || last.type==='out') ? 'in' : 'out';
+  }
+
+  function showToast(msg){
+    let t = document.createElement('div');
+    t.className='aa-toast'; t.textContent = msg;
+    document.body.appendChild(t);
+    setTimeout(()=>t.remove(), 2200);
+  }
+
+  function punch(empId){
+    const emp = STORE.employees.find(e=>e.id===empId);
+    if(!emp) return;
+    const type = nextTypeFor(empId);
+    const now = new Date();
+    STORE.records.push({ id: uid(), employeeId: empId, name: emp.name, type, timestamp: now.toISOString() });
+    saveRecords();
+    state.modal = 'done';
+    state.doneInfo = { name: emp.name, type, time: fmtTime(now) };
+    render();
+    if(state.doneTimer) clearTimeout(state.doneTimer);
+    state.doneTimer = setTimeout(()=>{ state.modal=null; state.doneInfo=null; render(); }, 1500);
+  }
+
+  function openPunchModal(empId){ state.selectedEmployee = empId; state.modal='punch'; render(); }
+  function closeModal(){ state.modal=null; state.adminAuthed=false; render(); }
+
+  function openAdmin(){ state.modal='admin-login'; state.pinInput=''; state.err=''; render(); }
+  function tryPin(){
+    if(state.pinInput === STORE.pin){ state.adminAuthed=true; state.modal='admin'; state.adminTab='employees'; state.err=''; }
+    else{ state.err='暗証番号が違います'; }
+    render();
+  }
+
+  function addEmployee(name){
+    if(!name.trim()) return;
+    STORE.employees.push({ id: uid(), name: name.trim() });
+    saveEmployees();
+    render();
+  }
+  function removeEmployee(id){
+    STORE.employees = STORE.employees.filter(e=>e.id!==id);
+    saveEmployees();
+    render();
+  }
+  function renameEmployee(id, name){
+    const e = STORE.employees.find(e=>e.id===id);
+    if(e && name.trim()){ e.name = name.trim(); saveEmployees(); render(); }
+  }
+  function deleteRecord(id){
+    STORE.records = STORE.records.filter(r=>r.id!==id);
+    saveRecords();
+    render();
+  }
+
+  function monthsAvailable(){
+    const set = new Set(STORE.records.map(r=> r.timestamp.slice(0,7)));
+    const now = new Date();
+    set.add(now.getFullYear()+'-'+pad(now.getMonth()+1));
+    return Array.from(set).sort().reverse();
+  }
+
+  function exportCSV(){
+    const month = state.filterMonth || monthsAvailable()[0];
+    let rows = STORE.records.filter(r=> r.timestamp.startsWith(month));
+    if(state.filterEmp !== 'all') rows = rows.filter(r=>r.employeeId===state.filterEmp);
+    rows = rows.sort((a,b)=> a.timestamp.localeCompare(b.timestamp));
+    let csv = '\uFEFF氏名,種別,日付,時刻\n';
+    rows.forEach(r=>{
+      const d = new Date(r.timestamp);
+      csv += [r.name, r.type==='in'?'出勤':'退勤', fmtDate(d), fmtTime(d)].join(',') + '\n';
+    });
+    const blob = new Blob([csv], {type:'text/csv'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = '勤怠_' + month + '.csv';
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  function render(){
+    const now = new Date();
+    let html = '';
+    html += '<div class="aa-header"><div class="aa-brand"><span class="eyebrow">ATTENDANCE</span><h1>勤怠打刻</h1></div>'
+      + '<div class="aa-clock"><div class="time">'+fmtTime(now)+'</div><div class="date">'+fmtDate(now)+'（'+weekday(now)+'）</div></div></div>';
+
+    if(STORE.employees.length===0){
+      html += '<div class="aa-empty">従業員が登録されていません。<br>右下の設定ボタンから管理者ログインし、従業員を登録してください。</div>';
+    } else {
+      html += '<div class="aa-grid">';
+      STORE.employees.forEach(emp=>{
+        const t = nextTypeFor(emp.id);
+        const statusLabel = t==='in' ? '未出勤' : '出勤中';
+        const statusClass = t==='in' ? 'out' : 'in';
+        html += '<div class="aa-tile" data-punch="'+emp.id+'">'
+          + '<div class="name">'+escapeHtml(emp.name)+'</div>'
+          + '<div class="status '+statusClass+'">'+statusLabel+'</div>'
+          + '</div>';
+      });
+      html += '</div>';
+    }
+
+    html += '<div class="aa-fab" id="aa-admin-btn">⚙</div>';
+
+    if(state.modal==='punch'){
+      const emp = STORE.employees.find(e=>e.id===state.selectedEmployee);
+      const type = nextTypeFor(emp.id);
+      html += '<div class="aa-overlay" id="aa-overlay"><div class="aa-modal">'
+        + '<h2>'+escapeHtml(emp.name)+' さん</h2>'
+        + '<div class="sub">現在時刻 '+fmtTime(new Date())+'</div>'
+        + '<button class="aa-btn primary '+(type==='out'?'out':'')+'" id="aa-punch-confirm">'+(type==='in'?'出勤する':'退勤する')+'</button>'
+        + '<button class="aa-btn ghost" id="aa-cancel">キャンセル</button>'
+        + '</div></div>';
+    }
+
+    if(state.modal==='done'){
+      const info = state.doneInfo;
+      html += '<div class="aa-overlay"><div class="aa-modal" style="text-align:center;">'
+        + '<div style="font-size:46px;color:var(--accent-deep);">✓</div>'
+        + '<h2>'+escapeHtml(info.name)+'さん '+(info.type==='in'?'出勤':'退勤')+'</h2>'
+        + '<div class="sub">'+info.time+' に記録しました</div>'
+        + '</div></div>';
+    }
+
+    if(state.modal==='admin-login'){
+      html += '<div class="aa-overlay" id="aa-overlay"><div class="aa-modal">'
+        + '<h2>管理者ログイン</h2><div class="sub">暗証番号を入力してください（初期値: 0000）</div>'
+        + '<input class="aa-input" id="aa-pin-input" type="password" inputmode="numeric" placeholder="暗証番号" value="'+(state.pinInput||'')+'">'
+        + '<div class="aa-err">'+(state.err||'')+'</div>'
+        + '<button class="aa-btn primary" id="aa-pin-submit">ログイン</button>'
+        + '<button class="aa-btn ghost" id="aa-cancel">閉じる</button>'
+        + '</div></div>';
+    }
+
+    if(state.modal==='admin' && state.adminAuthed){
+      html += '<div class="aa-overlay" id="aa-overlay"><div class="aa-modal wide">'
+        + '<h2>管理者画面</h2>'
+        + '<div class="aa-tabs">'
+        + tabBtn('employees','従業員管理') + tabBtn('records','勤怠データ') + tabBtn('settings','設定')
+        + '</div>';
+
+      if(state.adminTab==='employees'){
+        html += '<div class="aa-row"><input class="aa-input" id="aa-new-emp" placeholder="新しい従業員名"><button class="aa-btn small primary" id="aa-add-emp">追加</button></div>';
+        html += '<div style="margin-top:16px;">';
+        STORE.employees.forEach(e=>{
+          html += '<div class="aa-list-item"><span class="lbl">'+escapeHtml(e.name)+'</span>'
+            + '<span><span class="aa-del" data-rename="'+e.id+'" style="margin-right:14px;color:var(--accent-deep);">名前変更</span>'
+            + '<span class="aa-del" data-remove="'+e.id+'">削除</span></span></div>';
+        });
+        if(STORE.employees.length===0) html += '<div class="sub">従業員がいません</div>';
+        html += '</div>';
+      }
+
+      if(state.adminTab==='records'){
+        const months = monthsAvailable();
+        if(!state.filterMonth) state.filterMonth = months[0];
+        html += '<div class="aa-filterbar">'
+          + '<select id="aa-filter-month">' + months.map(m=>'<option value="'+m+'" '+(m===state.filterMonth?'selected':'')+'>'+m+'</option>').join('') + '</select>'
+          + '<select id="aa-filter-emp"><option value="all">全員</option>' + STORE.employees.map(e=>'<option value="'+e.id+'" '+(state.filterEmp===e.id?'selected':'')+'>'+escapeHtml(e.name)+'</option>').join('') + '</select>'
+          + '<button class="aa-btn small primary" id="aa-export">CSVエクスポート</button>'
+          + '</div>';
+        let rows = STORE.records.filter(r=> r.timestamp.startsWith(state.filterMonth));
+        if(state.filterEmp!=='all') rows = rows.filter(r=>r.employeeId===state.filterEmp);
+        rows = rows.sort((a,b)=> b.timestamp.localeCompare(a.timestamp));
+        html += '<table class="aa-table"><thead><tr><th>氏名</th><th>種別</th><th>日付</th><th>時刻</th><th></th></tr></thead><tbody>';
+        rows.forEach(r=>{
+          const d = new Date(r.timestamp);
+          html += '<tr><td>'+escapeHtml(r.name)+'</td><td>'+(r.type==='in'?'出勤':'退勤')+'</td><td>'+fmtDateShort(d)+'('+weekday(d)+')</td><td>'+fmtTime(d)+'</td>'
+            + '<td><span class="aa-del" data-delrecord="'+r.id+'">削除</span></td></tr>';
+        });
+        if(rows.length===0) html += '<tr><td colspan="5" class="sub">データがありません</td></tr>';
+        html += '</tbody></table>';
+      }
+
+      if(state.adminTab==='settings'){
+        html += '<span class="aa-label">管理者暗証番号の変更</span>'
+          + '<input class="aa-input" id="aa-new-pin" type="password" inputmode="numeric" placeholder="新しい暗証番号">'
+          + '<button class="aa-btn small primary" id="aa-save-pin">変更する</button>';
+      }
+
+      html += '<button class="aa-btn ghost" id="aa-cancel" style="margin-top:20px;">閉じる</button>';
+      html += '</div></div>';
+    }
+
+    root.innerHTML = html;
+    attachHandlers();
+  }
+
+  function tabBtn(key,label){
+    return '<div class="aa-tab '+(state.adminTab===key?'active':'')+'" data-tab="'+key+'">'+label+'</div>';
+  }
+  function escapeHtml(s){ return (s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+  function attachHandlers(){
+    root.querySelectorAll('[data-punch]').forEach(el=> el.onclick = ()=> openPunchModal(el.getAttribute('data-punch')) );
+    const adminBtn = document.getElementById('aa-admin-btn');
+    if(adminBtn) adminBtn.onclick = openAdmin;
+    const cancel = document.getElementById('aa-cancel');
+    if(cancel) cancel.onclick = closeModal;
+    const confirmBtn = document.getElementById('aa-punch-confirm');
+    if(confirmBtn) confirmBtn.onclick = ()=> punch(state.selectedEmployee);
+    const pinInput = document.getElementById('aa-pin-input');
+    if(pinInput){ pinInput.oninput = (e)=> state.pinInput = e.target.value; pinInput.onkeydown = (e)=>{ if(e.key==='Enter') tryPin(); }; }
+    const pinSubmit = document.getElementById('aa-pin-submit');
+    if(pinSubmit) pinSubmit.onclick = tryPin;
+    root.querySelectorAll('[data-tab]').forEach(el=> el.onclick = ()=>{ state.adminTab = el.getAttribute('data-tab'); render(); } );
+    const addEmpBtn = document.getElementById('aa-add-emp');
+    if(addEmpBtn){ addEmpBtn.onclick = ()=>{ const v = document.getElementById('aa-new-emp').value; addEmployee(v); }; }
+    root.querySelectorAll('[data-remove]').forEach(el=> el.onclick = ()=>{ if(confirm('削除しますか？')) removeEmployee(el.getAttribute('data-remove')); } );
+    root.querySelectorAll('[data-rename]').forEach(el=> el.onclick = ()=>{ const id=el.getAttribute('data-rename'); const cur = STORE.employees.find(e=>e.id===id); const name = prompt('新しい名前', cur?cur.name:''); if(name) renameEmployee(id,name); } );
+    root.querySelectorAll('[data-delrecord]').forEach(el=> el.onclick = ()=>{ if(confirm('この記録を削除しますか？')) deleteRecord(el.getAttribute('data-delrecord')); } );
+    const exportBtn = document.getElementById('aa-export');
+    if(exportBtn) exportBtn.onclick = exportCSV;
+    const filterMonth = document.getElementById('aa-filter-month');
+    if(filterMonth) filterMonth.onchange = (e)=>{ state.filterMonth = e.target.value; render(); };
+    const filterEmp = document.getElementById('aa-filter-emp');
+    if(filterEmp) filterEmp.onchange = (e)=>{ state.filterEmp = e.target.value; render(); };
+    const savePinBtn = document.getElementById('aa-save-pin');
+    if(savePinBtn){ savePinBtn.onclick = ()=>{ const v = document.getElementById('aa-new-pin').value; if(v && v.length>=4){ STORE.pin = v; savePin(); showToast('暗証番号を変更しました'); } else { alert('4桁以上で入力してください'); } }; }
+  }
+
+  loadAll();
+  setInterval(()=>{ if(!state.modal) render(); }, 15000);
+
+  if('serviceWorker' in navigator){
+    window.addEventListener('load', ()=>{
+      navigator.serviceWorker.register('service-worker.js').catch(()=>{});
+    });
+  }
+})();
+</script>
+</body>
+</html>

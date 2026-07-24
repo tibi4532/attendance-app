@@ -70,18 +70,22 @@
   const KEY_EMP = 'aa_employees';
   const KEY_REC = 'aa_records';
   const KEY_PIN = 'aa_pin';
-  const STORE = { employees: [], records: [], pin: '0000' };
+  const KEY_PINLOG = 'aa_pinlogs';
+  const STORE = { employees: [], records: [], pin: '0000', pinLogs: [] };
   let state = { modal: null, adminAuthed:false, adminTab:'employees', selectedEmployee:null, filterMonth:null, filterEmp:'all' };
 
   function loadAll(){
     try{ STORE.employees = JSON.parse(localStorage.getItem(KEY_EMP) || '[]'); }catch(e){ STORE.employees = []; }
     try{ STORE.records = JSON.parse(localStorage.getItem(KEY_REC) || '[]'); }catch(e){ STORE.records = []; }
+    try{ STORE.pinLogs = JSON.parse(localStorage.getItem(KEY_PINLOG) || '[]'); }catch(e){ STORE.pinLogs = []; }
     STORE.pin = localStorage.getItem(KEY_PIN) || '0000';
     render();
   }
   function saveEmployees(){ localStorage.setItem(KEY_EMP, JSON.stringify(STORE.employees)); }
   function saveRecords(){ localStorage.setItem(KEY_REC, JSON.stringify(STORE.records)); }
   function savePin(){ localStorage.setItem(KEY_PIN, STORE.pin); }
+  function savePinLogs(){ localStorage.setItem(KEY_PINLOG, JSON.stringify(STORE.pinLogs)); }
+
 
   function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
   function pad(n){ return n.toString().padStart(2,'0'); }
@@ -170,6 +174,50 @@
     const e = STORE.employees.find(e=>e.id===id);
     if(e && pin && pin.trim().length>=4){ e.pin = pin.trim(); saveEmployees(); render(); showToast('PINを変更しました'); }
     else if(pin!==null){ alert('PINは4桁以上で入力してください'); }
+  }
+  function adminChangePinStart(id){
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.capture = 'user';
+    input.style.display = 'none';
+    input.onchange = (e)=>{
+      const file = e.target.files && e.target.files[0];
+      if(input.parentNode) document.body.removeChild(input);
+      if(!file){ return; }
+      const reader = new FileReader();
+      reader.onload = (ev)=>{
+        const img = new Image();
+        img.onload = ()=>{
+          const size = 200;
+          const canvas = document.createElement('canvas');
+          canvas.width = size; canvas.height = size;
+          const ctx = canvas.getContext('2d');
+          const s = Math.min(img.width, img.height);
+          const sx = (img.width - s)/2, sy = (img.height - s)/2;
+          ctx.drawImage(img, sx, sy, s, s, 0, 0, size, size);
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.5);
+          finishAdminPinChange(id, dataUrl);
+        };
+        img.src = ev.target.result;
+      };
+      reader.readAsDataURL(file);
+    };
+    document.body.appendChild(input);
+    input.click();
+  }
+  function finishAdminPinChange(id, photoDataUrl){
+    const emp = STORE.employees.find(e=>e.id===id);
+    if(!emp) return;
+    const pin = prompt(emp.name + ' さんの新しいPIN(4桁以上)');
+    if(pin===null) return;
+    if(pin.trim().length<4){ alert('PINは4桁以上で入力してください'); return; }
+    emp.pin = pin.trim();
+    saveEmployees();
+    STORE.pinLogs.unshift({ id: uid(), employeeId: id, employeeName: emp.name, timestamp: new Date().toISOString(), photo: photoDataUrl });
+    savePinLogs();
+    render();
+    showToast('PINを変更しました(変更記録を保存しました)');
   }
   function deleteRecord(id){
     STORE.records = STORE.records.filter(r=>r.id!==id);
@@ -299,7 +347,7 @@
       html += '<div class="aa-overlay" id="aa-overlay"><div class="aa-modal wide">'
         + '<h2>管理者画面</h2>'
         + '<div class="aa-tabs">'
-        + tabBtn('employees','従業員管理') + tabBtn('records','勤怠データ') + tabBtn('settings','設定')
+        + tabBtn('employees','従業員管理') + tabBtn('records','勤怠データ') + tabBtn('pinlogs','PIN変更履歴') + tabBtn('settings','設定')
         + '</div>';
 
       if(state.adminTab==='employees'){
@@ -336,6 +384,22 @@
         });
         if(rows.length===0) html += '<tr><td colspan="5" class="sub">データがありません</td></tr>';
         html += '</tbody></table>';
+      }
+
+      if(state.adminTab==='pinlogs'){
+        html += '<div class="sub">管理者画面からPINを変更した際の記録です(自己変更は含まれません)</div>';
+        if(STORE.pinLogs.length===0){
+          html += '<div class="sub">記録はまだありません</div>';
+        } else {
+          STORE.pinLogs.forEach(log=>{
+            const d = new Date(log.timestamp);
+            html += '<div class="aa-list-item" style="align-items:center;">'
+              + '<img src="'+log.photo+'" style="width:52px;height:52px;border-radius:8px;object-fit:cover;margin-right:12px;">'
+              + '<span class="lbl" style="flex:1;">'+escapeHtml(log.employeeName)+' さんのPIN変更</span>'
+              + '<span class="sub" style="margin:0;">'+fmtDateShort(d)+'('+weekday(d)+') '+fmtTime(d)+'</span>'
+              + '</div>';
+          });
+        }
       }
 
       if(state.adminTab==='settings'){
@@ -390,7 +454,7 @@
     if(addEmpBtn){ addEmpBtn.onclick = ()=>{ const v = document.getElementById('aa-new-emp').value; const p = document.getElementById('aa-new-emp-pin').value; addEmployee(v, p); }; }
     root.querySelectorAll('[data-remove]').forEach(el=> el.onclick = ()=>{ if(confirm('削除しますか？')) removeEmployee(el.getAttribute('data-remove')); } );
     root.querySelectorAll('[data-rename]').forEach(el=> el.onclick = ()=>{ const id=el.getAttribute('data-rename'); const cur = STORE.employees.find(e=>e.id===id); const name = prompt('新しい名前', cur?cur.name:''); if(name) renameEmployee(id,name); } );
-    root.querySelectorAll('[data-pinchange]').forEach(el=> el.onclick = ()=>{ const id=el.getAttribute('data-pinchange'); const pin = prompt('新しいPIN(4桁以上)'); if(pin!==null) changeEmployeePin(id,pin); } );
+    root.querySelectorAll('[data-pinchange]').forEach(el=> el.onclick = ()=>{ const id=el.getAttribute('data-pinchange'); if(confirm('カメラが起動します。撮影後に新しいPINを設定します。よろしいですか？')) adminChangePinStart(id); } );
     root.querySelectorAll('[data-delrecord]').forEach(el=> el.onclick = ()=>{ if(confirm('この記録を削除しますか？')) deleteRecord(el.getAttribute('data-delrecord')); } );
     const exportBtn = document.getElementById('aa-export');
     if(exportBtn) exportBtn.onclick = exportCSV;

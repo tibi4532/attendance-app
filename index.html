@@ -219,6 +219,12 @@
     render();
     showToast('PINを変更しました(変更記録を保存しました)');
   }
+  function deletePinLog(id){
+    const log = STORE.pinLogs.find(l=>l.id===id);
+    if(log){ log.photo = null; log.photoDeletedAt = new Date().toISOString(); }
+    savePinLogs();
+    render();
+  }
   function deleteRecord(id){
     STORE.records = STORE.records.filter(r=>r.id!==id);
     saveRecords();
@@ -394,9 +400,12 @@
           STORE.pinLogs.forEach(log=>{
             const d = new Date(log.timestamp);
             html += '<div class="aa-list-item" style="align-items:center;">'
-              + '<img src="'+log.photo+'" style="width:52px;height:52px;border-radius:8px;object-fit:cover;margin-right:12px;">'
+              + (log.photo
+                  ? '<img src="'+log.photo+'" style="width:52px;height:52px;border-radius:8px;object-fit:cover;margin-right:12px;">'
+                  : '<div style="width:52px;height:52px;border-radius:8px;background:#eee9db;color:var(--muted);font-size:10px;display:flex;align-items:center;justify-content:center;text-align:center;margin-right:12px;">写真<br>削除済</div>')
               + '<span class="lbl" style="flex:1;">'+escapeHtml(log.employeeName)+' さんのPIN変更</span>'
-              + '<span class="sub" style="margin:0;">'+fmtDateShort(d)+'('+weekday(d)+') '+fmtTime(d)+'</span>'
+              + '<span class="sub" style="margin:0 10px 0 0;">'+fmtDateShort(d)+'('+weekday(d)+') '+fmtTime(d)+'</span>'
+              + (log.photo ? '<span class="aa-del" data-delpinlog="'+log.id+'">写真を削除</span>' : '')
               + '</div>';
           });
         }
@@ -456,6 +465,7 @@
     root.querySelectorAll('[data-rename]').forEach(el=> el.onclick = ()=>{ const id=el.getAttribute('data-rename'); const cur = STORE.employees.find(e=>e.id===id); const name = prompt('新しい名前', cur?cur.name:''); if(name) renameEmployee(id,name); } );
     root.querySelectorAll('[data-pinchange]').forEach(el=> el.onclick = ()=>{ const id=el.getAttribute('data-pinchange'); if(confirm('カメラが起動します。撮影後に新しいPINを設定します。よろしいですか？')) adminChangePinStart(id); } );
     root.querySelectorAll('[data-delrecord]').forEach(el=> el.onclick = ()=>{ if(confirm('この記録を削除しますか？')) deleteRecord(el.getAttribute('data-delrecord')); } );
+    root.querySelectorAll('[data-delpinlog]').forEach(el=> el.onclick = ()=>{ if(confirm('写真のみ削除します(氏名・日時の記録は残ります)。よろしいですか？')) deletePinLog(el.getAttribute('data-delpinlog')); } );
     const exportBtn = document.getElementById('aa-export');
     if(exportBtn) exportBtn.onclick = exportCSV;
     const filterMonth = document.getElementById('aa-filter-month');

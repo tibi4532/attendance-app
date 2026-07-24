@@ -120,7 +120,26 @@
     state.doneTimer = setTimeout(()=>{ state.modal=null; state.doneInfo=null; render(); }, 1500);
   }
 
-  function openPunchModal(empId){ state.selectedEmployee = empId; state.modal='punch'; render(); }
+  function openPunchModal(empId){ state.selectedEmployee = empId; state.modal='action-select'; render(); }
+  function goToPinEntry(){ state.modal='pin-entry'; state.pinAttempt=''; state.pinErr=''; render(); }
+  function tryEmpPin(){
+    const emp = STORE.employees.find(e=>e.id===state.selectedEmployee);
+    if(emp && state.pinAttempt === emp.pin){ punch(state.selectedEmployee); }
+    else{ state.pinErr='PINが違います'; render(); }
+  }
+  function goToPinChangeVerify(){ state.modal='pinchange-verify'; state.oldPinAttempt=''; state.pinChangeErr=''; render(); }
+  function tryOldPin(){
+    const emp = STORE.employees.find(e=>e.id===state.selectedEmployee);
+    if(emp && state.oldPinAttempt === emp.pin){ state.modal='pinchange-new'; state.newPin1=''; state.newPin2=''; state.pinChangeErr=''; render(); }
+    else{ state.pinChangeErr='現在のPINが違います'; render(); }
+  }
+  function submitNewPin(){
+    if(!state.newPin1 || state.newPin1.length<4){ state.pinChangeErr='PINは4桁以上で入力してください'; render(); return; }
+    if(state.newPin1 !== state.newPin2){ state.pinChangeErr='新しいPINが一致しません'; render(); return; }
+    changeEmployeePin(state.selectedEmployee, state.newPin1);
+    state.modal = null;
+    render();
+  }
   function closeModal(){ state.modal=null; state.adminAuthed=false; render(); }
 
   function openAdmin(){ state.modal='admin-login'; state.pinInput=''; state.err=''; render(); }
@@ -130,9 +149,11 @@
     render();
   }
 
-  function addEmployee(name){
-    if(!name.trim()) return;
-    STORE.employees.push({ id: uid(), name: name.trim() });
+  function addEmployee(name, pin){
+    if(!name.trim()) { state.addErr='氏名を入力してください'; render(); return; }
+    if(!pin || pin.length<4){ state.addErr='PINは4桁以上で設定してください'; render(); return; }
+    STORE.employees.push({ id: uid(), name: name.trim(), pin: pin.trim() });
+    state.addErr='';
     saveEmployees();
     render();
   }
@@ -144,6 +165,11 @@
   function renameEmployee(id, name){
     const e = STORE.employees.find(e=>e.id===id);
     if(e && name.trim()){ e.name = name.trim(); saveEmployees(); render(); }
+  }
+  function changeEmployeePin(id, pin){
+    const e = STORE.employees.find(e=>e.id===id);
+    if(e && pin && pin.trim().length>=4){ e.pin = pin.trim(); saveEmployees(); render(); showToast('PINを変更しました'); }
+    else if(pin!==null){ alert('PINは4桁以上で入力してください'); }
   }
   function deleteRecord(id){
     STORE.records = STORE.records.filter(r=>r.id!==id);
@@ -200,13 +226,52 @@
 
     html += '<div class="aa-fab" id="aa-admin-btn">⚙</div>';
 
-    if(state.modal==='punch'){
+    if(state.modal==='action-select'){
       const emp = STORE.employees.find(e=>e.id===state.selectedEmployee);
       const type = nextTypeFor(emp.id);
       html += '<div class="aa-overlay" id="aa-overlay"><div class="aa-modal">'
         + '<h2>'+escapeHtml(emp.name)+' さん</h2>'
-        + '<div class="sub">現在時刻 '+fmtTime(new Date())+'</div>'
-        + '<button class="aa-btn primary '+(type==='out'?'out':'')+'" id="aa-punch-confirm">'+(type==='in'?'出勤する':'退勤する')+'</button>'
+        + '<div class="sub">操作を選んでください</div>'
+        + '<button class="aa-btn primary '+(type==='out'?'out':'')+'" id="aa-goto-punch">'+(type==='in'?'出勤する':'退勤する')+'</button>'
+        + '<button class="aa-btn ghost" id="aa-goto-pinchange">PINの変更</button>'
+        + '<button class="aa-btn ghost" id="aa-cancel">キャンセル</button>'
+        + '</div></div>';
+    }
+
+    if(state.modal==='pin-entry'){
+      const emp = STORE.employees.find(e=>e.id===state.selectedEmployee);
+      const type = nextTypeFor(emp.id);
+      html += '<div class="aa-overlay" id="aa-overlay"><div class="aa-modal">'
+        + '<h2>'+escapeHtml(emp.name)+' さん</h2>'
+        + '<div class="sub">'+(type==='in'?'出勤':'退勤')+'の記録には本人のPINが必要です</div>'
+        + '<input class="aa-input" id="aa-emp-pin-input" type="password" inputmode="numeric" placeholder="PIN" value="'+(state.pinAttempt||'')+'">'
+        + '<div class="aa-err">'+(state.pinErr||'')+'</div>'
+        + '<button class="aa-btn primary '+(type==='out'?'out':'')+'" id="aa-emp-pin-submit">確定</button>'
+        + '<button class="aa-btn ghost" id="aa-cancel">キャンセル</button>'
+        + '</div></div>';
+    }
+
+    if(state.modal==='pinchange-verify'){
+      const emp = STORE.employees.find(e=>e.id===state.selectedEmployee);
+      html += '<div class="aa-overlay" id="aa-overlay"><div class="aa-modal">'
+        + '<h2>'+escapeHtml(emp.name)+' さん</h2>'
+        + '<div class="sub">現在のPINを入力してください</div>'
+        + '<input class="aa-input" id="aa-oldpin-input" type="password" inputmode="numeric" placeholder="現在のPIN" value="'+(state.oldPinAttempt||'')+'">'
+        + '<div class="aa-err">'+(state.pinChangeErr||'')+'</div>'
+        + '<button class="aa-btn primary" id="aa-oldpin-submit">次へ</button>'
+        + '<button class="aa-btn ghost" id="aa-cancel">キャンセル</button>'
+        + '</div></div>';
+    }
+
+    if(state.modal==='pinchange-new'){
+      const emp = STORE.employees.find(e=>e.id===state.selectedEmployee);
+      html += '<div class="aa-overlay" id="aa-overlay"><div class="aa-modal">'
+        + '<h2>新しいPINを設定</h2>'
+        + '<div class="sub">'+escapeHtml(emp.name)+' さんの新しいPIN(4桁以上)を入力してください</div>'
+        + '<input class="aa-input" id="aa-newpin1-input" type="password" inputmode="numeric" placeholder="新しいPIN" value="'+(state.newPin1||'')+'">'
+        + '<input class="aa-input" id="aa-newpin2-input" type="password" inputmode="numeric" placeholder="新しいPIN(確認)" value="'+(state.newPin2||'')+'">'
+        + '<div class="aa-err">'+(state.pinChangeErr||'')+'</div>'
+        + '<button class="aa-btn primary" id="aa-newpin-submit">変更する</button>'
         + '<button class="aa-btn ghost" id="aa-cancel">キャンセル</button>'
         + '</div></div>';
     }
@@ -238,11 +303,14 @@
         + '</div>';
 
       if(state.adminTab==='employees'){
-        html += '<div class="aa-row"><input class="aa-input" id="aa-new-emp" placeholder="新しい従業員名"><button class="aa-btn small primary" id="aa-add-emp">追加</button></div>';
+        html += '<div class="aa-row"><input class="aa-input" id="aa-new-emp" placeholder="従業員名"></div>'
+          + '<div class="aa-row"><input class="aa-input" id="aa-new-emp-pin" type="text" inputmode="numeric" placeholder="PIN(4桁以上)"><button class="aa-btn small primary" id="aa-add-emp">追加</button></div>'
+          + '<div class="aa-err">'+(state.addErr||'')+'</div>';
         html += '<div style="margin-top:16px;">';
         STORE.employees.forEach(e=>{
           html += '<div class="aa-list-item"><span class="lbl">'+escapeHtml(e.name)+'</span>'
-            + '<span><span class="aa-del" data-rename="'+e.id+'" style="margin-right:14px;color:var(--accent-deep);">名前変更</span>'
+            + '<span><span class="aa-del" data-rename="'+e.id+'" style="margin-right:10px;color:var(--accent-deep);">名前変更</span>'
+            + '<span class="aa-del" data-pinchange="'+e.id+'" style="margin-right:10px;color:var(--accent-deep);">PIN変更</span>'
             + '<span class="aa-del" data-remove="'+e.id+'">削除</span></span></div>';
         });
         if(STORE.employees.length===0) html += '<div class="sub">従業員がいません</div>';
@@ -295,17 +363,34 @@
     if(adminBtn) adminBtn.onclick = openAdmin;
     const cancel = document.getElementById('aa-cancel');
     if(cancel) cancel.onclick = closeModal;
-    const confirmBtn = document.getElementById('aa-punch-confirm');
-    if(confirmBtn) confirmBtn.onclick = ()=> punch(state.selectedEmployee);
+    const gotoPunch = document.getElementById('aa-goto-punch');
+    if(gotoPunch) gotoPunch.onclick = goToPinEntry;
+    const gotoPinchange = document.getElementById('aa-goto-pinchange');
+    if(gotoPinchange) gotoPinchange.onclick = goToPinChangeVerify;
+    const empPinInput = document.getElementById('aa-emp-pin-input');
+    if(empPinInput){ empPinInput.oninput = (e)=> state.pinAttempt = e.target.value; empPinInput.onkeydown = (e)=>{ if(e.key==='Enter') tryEmpPin(); }; }
+    const empPinSubmit = document.getElementById('aa-emp-pin-submit');
+    if(empPinSubmit) empPinSubmit.onclick = tryEmpPin;
+    const oldPinInput = document.getElementById('aa-oldpin-input');
+    if(oldPinInput){ oldPinInput.oninput = (e)=> state.oldPinAttempt = e.target.value; oldPinInput.onkeydown = (e)=>{ if(e.key==='Enter') tryOldPin(); }; }
+    const oldPinSubmit = document.getElementById('aa-oldpin-submit');
+    if(oldPinSubmit) oldPinSubmit.onclick = tryOldPin;
+    const newPin1Input = document.getElementById('aa-newpin1-input');
+    if(newPin1Input) newPin1Input.oninput = (e)=> state.newPin1 = e.target.value;
+    const newPin2Input = document.getElementById('aa-newpin2-input');
+    if(newPin2Input){ newPin2Input.oninput = (e)=> state.newPin2 = e.target.value; newPin2Input.onkeydown = (e)=>{ if(e.key==='Enter') submitNewPin(); }; }
+    const newPinSubmit = document.getElementById('aa-newpin-submit');
+    if(newPinSubmit) newPinSubmit.onclick = submitNewPin;
     const pinInput = document.getElementById('aa-pin-input');
     if(pinInput){ pinInput.oninput = (e)=> state.pinInput = e.target.value; pinInput.onkeydown = (e)=>{ if(e.key==='Enter') tryPin(); }; }
     const pinSubmit = document.getElementById('aa-pin-submit');
     if(pinSubmit) pinSubmit.onclick = tryPin;
     root.querySelectorAll('[data-tab]').forEach(el=> el.onclick = ()=>{ state.adminTab = el.getAttribute('data-tab'); render(); } );
     const addEmpBtn = document.getElementById('aa-add-emp');
-    if(addEmpBtn){ addEmpBtn.onclick = ()=>{ const v = document.getElementById('aa-new-emp').value; addEmployee(v); }; }
+    if(addEmpBtn){ addEmpBtn.onclick = ()=>{ const v = document.getElementById('aa-new-emp').value; const p = document.getElementById('aa-new-emp-pin').value; addEmployee(v, p); }; }
     root.querySelectorAll('[data-remove]').forEach(el=> el.onclick = ()=>{ if(confirm('削除しますか？')) removeEmployee(el.getAttribute('data-remove')); } );
     root.querySelectorAll('[data-rename]').forEach(el=> el.onclick = ()=>{ const id=el.getAttribute('data-rename'); const cur = STORE.employees.find(e=>e.id===id); const name = prompt('新しい名前', cur?cur.name:''); if(name) renameEmployee(id,name); } );
+    root.querySelectorAll('[data-pinchange]').forEach(el=> el.onclick = ()=>{ const id=el.getAttribute('data-pinchange'); const pin = prompt('新しいPIN(4桁以上)'); if(pin!==null) changeEmployeePin(id,pin); } );
     root.querySelectorAll('[data-delrecord]').forEach(el=> el.onclick = ()=>{ if(confirm('この記録を削除しますか？')) deleteRecord(el.getAttribute('data-delrecord')); } );
     const exportBtn = document.getElementById('aa-export');
     if(exportBtn) exportBtn.onclick = exportCSV;

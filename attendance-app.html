@@ -1,98 +1,143 @@
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>勤怠打刻</title>
-<link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#2f6f5e">
-<link rel="icon" href="icon-192.png">
+<div id="attendance-app"></div>
 <style>
-  html,body{ margin:0; padding:0; }
   #attendance-app, #attendance-app * { box-sizing: border-box; }
   :root{
-    --ink:#1c2b2d; --paper:#f6f4ee; --card:#ffffff; --line:#dfd9c9;
-    --accent:#2f6f5e; --accent-deep:#1f4f42; --warn:#b5482f; --muted:#6b7573;
+    --ink:#1c2b2d;
+    --paper:#f6f4ee;
+    --card:#ffffff;
+    --line:#dfd9c9;
+    --accent:#2f6f5e;
+    --accent-deep:#1f4f42;
+    --warn:#b5482f;
+    --gold:#c8973a;
+    --muted:#6b7573;
   }
   #attendance-app{
     font-family: "Hiragino Sans","Yu Gothic UI","Noto Sans JP",system-ui,sans-serif;
-    background: var(--paper); color: var(--ink); min-height: 100vh; -webkit-tap-highlight-color: transparent;
+    background: var(--paper);
+    color: var(--ink);
+    min-height: 100vh;
+    padding: 0;
+    -webkit-tap-highlight-color: transparent;
   }
-  .aa-header{ display:flex; align-items:center; justify-content:space-between; padding: 22px 28px 18px; border-bottom: 1px solid var(--line); }
+  .aa-header{
+    display:flex; align-items:center; justify-content:space-between;
+    padding: 22px 28px 18px;
+    border-bottom: 1px solid var(--line);
+  }
   .aa-brand{ display:flex; flex-direction:column; gap:2px; }
   .aa-brand .eyebrow{ font-size:12px; letter-spacing:.14em; color:var(--muted); }
   .aa-brand h1{ margin:0; font-size:22px; font-weight:700; }
   .aa-clock{ text-align:right; }
   .aa-clock .time{ font-size:34px; font-weight:700; font-variant-numeric: tabular-nums; color:var(--accent-deep); line-height:1; }
   .aa-clock .date{ font-size:13px; color:var(--muted); margin-top:4px; }
-  .aa-grid{ display:grid; grid-template-columns: repeat(auto-fill, minmax(160px,1fr)); gap: 16px; padding: 24px 28px 100px; }
-  .aa-tile{ background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 22px 14px; text-align:center; cursor:pointer; min-height: 108px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; }
+
+  .aa-grid{
+    display:grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px,1fr));
+    gap: 16px;
+    padding: 24px 28px 100px;
+  }
+  .aa-tile{
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 22px 14px;
+    text-align:center;
+    cursor:pointer;
+    min-height: 108px;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px;
+    transition: transform .12s ease, box-shadow .12s ease;
+  }
   .aa-tile:active{ transform: scale(.97); }
   .aa-tile .name{ font-size:18px; font-weight:700; }
   .aa-tile .status{ font-size:12px; padding:3px 10px; border-radius:100px; font-weight:600; }
   .aa-tile .status.out{ background:#eee9db; color:var(--muted); }
   .aa-tile .status.in{ background: rgba(47,111,94,.12); color: var(--accent-deep); }
+
   .aa-empty{ padding: 60px 20px; text-align:center; color:var(--muted); }
-  .aa-fab{ position: fixed; right: 22px; bottom: 22px; width: 52px; height:52px; border-radius:50%; background: var(--card); border:1px solid var(--line); display:flex; align-items:center; justify-content:center; font-size:22px; cursor:pointer; color:var(--muted); }
-  .aa-overlay{ position: fixed; inset:0; background: rgba(28,43,45,.45); display:flex; align-items:center; justify-content:center; padding:20px; z-index:50; }
-  .aa-modal{ background: var(--card); border-radius:16px; padding:28px; width:100%; max-width:420px; max-height:86vh; overflow:auto; }
+  .aa-empty button{ margin-top:14px; }
+
+  .aa-fab{
+    position: fixed; right: 22px; bottom: 22px;
+    width: 52px; height:52px; border-radius:50%;
+    background: var(--card); border:1px solid var(--line);
+    display:flex; align-items:center; justify-content:center;
+    font-size:22px; cursor:pointer; color:var(--muted);
+  }
+
+  .aa-overlay{
+    position: fixed; inset:0; background: rgba(28,43,45,.45);
+    display:flex; align-items:center; justify-content:center; padding:20px; z-index:50;
+  }
+  .aa-modal{
+    background: var(--card); border-radius:16px; padding:28px;
+    width:100%; max-width:420px; max-height:86vh; overflow:auto;
+  }
   .aa-modal.wide{ max-width:760px; }
   .aa-modal h2{ margin:0 0 4px; font-size:20px; }
   .aa-modal .sub{ color:var(--muted); font-size:13px; margin-bottom:18px; }
-  .aa-btn{ display:block; width:100%; padding:16px; border-radius:10px; border:none; font-size:17px; font-weight:700; cursor:pointer; margin-top:10px; }
+  .aa-btn{
+    display:block; width:100%; padding:16px; border-radius:10px; border:none;
+    font-size:17px; font-weight:700; cursor:pointer; margin-top:10px;
+  }
   .aa-btn.primary{ background: var(--accent); color:#fff; }
   .aa-btn.primary.out{ background: var(--warn); }
   .aa-btn.ghost{ background: transparent; border:1px solid var(--line); color:var(--ink); }
   .aa-btn.small{ padding:10px 14px; font-size:14px; width:auto; display:inline-block; margin:6px 6px 0 0; }
+  .aa-btn:disabled{ opacity:.4; cursor:not-allowed; }
+
   .aa-row{ display:flex; gap:8px; align-items:center; }
-  .aa-input{ width:100%; padding:12px 14px; border-radius:8px; border:1px solid var(--line); font-size:15px; background:#fbfaf6; margin-top:6px; }
+  .aa-input{
+    width:100%; padding:12px 14px; border-radius:8px; border:1px solid var(--line);
+    font-size:15px; background:#fbfaf6; margin-top:6px;
+  }
   .aa-label{ font-size:12px; color:var(--muted); margin-top:14px; display:block; }
+
   .aa-tabs{ display:flex; gap:6px; margin-bottom:16px; border-bottom:1px solid var(--line); }
   .aa-tab{ padding:10px 14px; cursor:pointer; font-size:14px; color:var(--muted); border-bottom:2px solid transparent; }
   .aa-tab.active{ color:var(--accent-deep); border-color:var(--accent-deep); font-weight:700; }
+
   .aa-list-item{ display:flex; align-items:center; justify-content:space-between; padding:10px 0; border-bottom:1px solid var(--line); }
   .aa-list-item .lbl{ font-weight:600; }
+
   table.aa-table{ width:100%; border-collapse:collapse; font-size:13px; }
   table.aa-table th, table.aa-table td{ padding:8px 6px; border-bottom:1px solid var(--line); text-align:left; white-space:nowrap; }
   table.aa-table th{ color:var(--muted); font-weight:600; }
   .aa-del{ color:var(--warn); cursor:pointer; font-size:12px; }
-  .aa-toast{ position:fixed; left:50%; bottom:28px; transform:translateX(-50%); background: var(--accent-deep); color:#fff; padding:14px 22px; border-radius:10px; font-size:15px; font-weight:600; z-index:80; box-shadow:0 8px 20px rgba(0,0,0,.2); }
+
+  .aa-toast{
+    position:fixed; left:50%; bottom:28px; transform:translateX(-50%);
+    background: var(--accent-deep); color:#fff; padding:14px 22px; border-radius:10px;
+    font-size:15px; font-weight:600; z-index:80; box-shadow:0 8px 20px rgba(0,0,0,.2);
+  }
   .aa-err{ color:var(--warn); font-size:13px; margin-top:8px; min-height:16px; }
   .aa-filterbar{ display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap; }
   .aa-filterbar select{ padding:8px 10px; border-radius:8px; border:1px solid var(--line); background:#fbfaf6; }
 </style>
-</head>
-<body>
-<div id="attendance-app"></div>
 <script>
 (function(){
   const root = document.getElementById('attendance-app');
-  const KEY_EMP = 'aa_employees';
-  const KEY_REC = 'aa_records';
-  const KEY_PIN = 'aa_pin';
-  const KEY_PINLOG = 'aa_pinlogs';
-  const KEY_ADMINS = 'aa_admins';
-  const STORE = { employees: [], records: [], pin: '0000', pinLogs: [], admins: [] };
+  const STORE = { employees: null, records: null, pin: '0000', pinLogs: [], admins: [] };
   let state = { modal: null, adminAuthed:false, adminTab:'employees', selectedEmployee:null, filterMonth:null, filterEmp:'all', currentAdminName:null };
 
-  function loadAll(){
-    try{ STORE.employees = JSON.parse(localStorage.getItem(KEY_EMP) || '[]'); }catch(e){ STORE.employees = []; }
-    try{ STORE.records = JSON.parse(localStorage.getItem(KEY_REC) || '[]'); }catch(e){ STORE.records = []; }
-    try{ STORE.pinLogs = JSON.parse(localStorage.getItem(KEY_PINLOG) || '[]'); }catch(e){ STORE.pinLogs = []; }
-    try{ STORE.admins = JSON.parse(localStorage.getItem(KEY_ADMINS) || '[]'); }catch(e){ STORE.admins = []; }
-    STORE.pin = localStorage.getItem(KEY_PIN) || '0000';
+  async function loadAll(){
+    try{ const r = await window.storage.get('employees'); STORE.employees = r ? JSON.parse(r.value) : []; }catch(e){ STORE.employees = []; }
+    try{ const r = await window.storage.get('records'); STORE.records = r ? JSON.parse(r.value) : []; }catch(e){ STORE.records = []; }
+    try{ const r = await window.storage.get('settings'); STORE.pin = r ? JSON.parse(r.value).pin : '0000'; }catch(e){ STORE.pin = '0000'; }
+    try{ const r = await window.storage.get('pinlogs'); STORE.pinLogs = r ? JSON.parse(r.value) : []; }catch(e){ STORE.pinLogs = []; }
+    try{ const r = await window.storage.get('admins'); STORE.admins = r ? JSON.parse(r.value) : []; }catch(e){ STORE.admins = []; }
     if(STORE.admins.length===0){
       STORE.admins = [{ id: uid(), name: '管理者(初期)', pin: STORE.pin }];
-      saveAdmins();
+      await saveAdmins();
     }
     render();
   }
-  function saveEmployees(){ localStorage.setItem(KEY_EMP, JSON.stringify(STORE.employees)); }
-  function saveRecords(){ localStorage.setItem(KEY_REC, JSON.stringify(STORE.records)); }
-  function savePin(){ localStorage.setItem(KEY_PIN, STORE.pin); }
-  function savePinLogs(){ localStorage.setItem(KEY_PINLOG, JSON.stringify(STORE.pinLogs)); }
-  function saveAdmins(){ localStorage.setItem(KEY_ADMINS, JSON.stringify(STORE.admins)); }
-
+  async function saveEmployees(){ await window.storage.set('employees', JSON.stringify(STORE.employees), false); }
+  async function saveRecords(){ await window.storage.set('records', JSON.stringify(STORE.records), false); }
+  async function savePin(){ await window.storage.set('settings', JSON.stringify({pin: STORE.pin}), false); }
+  async function savePinLogs(){ await window.storage.set('pinlogs', JSON.stringify(STORE.pinLogs), false); }
+  async function saveAdmins(){ await window.storage.set('admins', JSON.stringify(STORE.admins), false); }
 
   function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
   function pad(n){ return n.toString().padStart(2,'0'); }
@@ -120,13 +165,13 @@
     setTimeout(()=>t.remove(), 2200);
   }
 
-  function punch(empId){
+  async function punch(empId){
     const emp = STORE.employees.find(e=>e.id===empId);
     if(!emp) return;
     const type = nextTypeFor(empId);
     const now = new Date();
     STORE.records.push({ id: uid(), employeeId: empId, name: emp.name, type, timestamp: now.toISOString() });
-    saveRecords();
+    await saveRecords();
     state.modal = 'done';
     state.doneInfo = { name: emp.name, type, time: fmtTime(now) };
     render();
@@ -147,10 +192,10 @@
     if(emp && state.oldPinAttempt === emp.pin){ state.modal='pinchange-new'; state.newPin1=''; state.newPin2=''; state.pinChangeErr=''; render(); }
     else{ state.pinChangeErr='現在のPINが違います'; render(); }
   }
-  function submitNewPin(){
+  async function submitNewPin(){
     if(!state.newPin1 || state.newPin1.length<4){ state.pinChangeErr='PINは4桁以上で入力してください'; render(); return; }
     if(state.newPin1 !== state.newPin2){ state.pinChangeErr='新しいPINが一致しません'; render(); return; }
-    changeEmployeePin(state.selectedEmployee, state.newPin1);
+    await changeEmployeePin(state.selectedEmployee, state.newPin1);
     state.modal = null;
     render();
   }
@@ -163,46 +208,46 @@
     else{ state.err='暗証番号が違います'; }
     render();
   }
-  function addAdmin(name, pin){
+  async function addAdmin(name, pin){
     if(!name || !name.trim()){ state.adminAddErr='名前を入力してください'; render(); return; }
     if(!pin || pin.length<4){ state.adminAddErr='PINは4桁以上で設定してください'; render(); return; }
     STORE.admins.push({ id: uid(), name: name.trim(), pin: pin.trim() });
     state.adminAddErr='';
-    saveAdmins();
+    await saveAdmins();
     render();
   }
-  function removeAdmin(id){
+  async function removeAdmin(id){
     if(STORE.admins.length<=1){ alert('最後の1人は削除できません'); return; }
     STORE.admins = STORE.admins.filter(a=>a.id!==id);
-    saveAdmins();
+    await saveAdmins();
     render();
   }
-  function changeAdminPin(id, pin){
+  async function changeAdminPin(id, pin){
     const a = STORE.admins.find(a=>a.id===id);
-    if(a && pin && pin.trim().length>=4){ a.pin = pin.trim(); saveAdmins(); render(); showToast('PINを変更しました'); }
+    if(a && pin && pin.trim().length>=4){ a.pin = pin.trim(); await saveAdmins(); render(); showToast('PINを変更しました'); }
     else if(pin!==null){ alert('PINは4桁以上で入力してください'); }
   }
 
-  function addEmployee(name, pin){
+  async function addEmployee(name, pin){
     if(!name.trim()) { state.addErr='氏名を入力してください'; render(); return; }
     if(!pin || pin.length<4){ state.addErr='PINは4桁以上で設定してください'; render(); return; }
     STORE.employees.push({ id: uid(), name: name.trim(), pin: pin.trim() });
     state.addErr='';
-    saveEmployees();
+    await saveEmployees();
     render();
   }
-  function removeEmployee(id){
+  async function removeEmployee(id){
     STORE.employees = STORE.employees.filter(e=>e.id!==id);
-    saveEmployees();
+    await saveEmployees();
     render();
   }
-  function renameEmployee(id, name){
+  async function renameEmployee(id, name){
     const e = STORE.employees.find(e=>e.id===id);
-    if(e && name.trim()){ e.name = name.trim(); saveEmployees(); render(); }
+    if(e && name.trim()){ e.name = name.trim(); await saveEmployees(); render(); }
   }
-  function changeEmployeePin(id, pin){
+  async function changeEmployeePin(id, pin){
     const e = STORE.employees.find(e=>e.id===id);
-    if(e && pin && pin.trim().length>=4){ e.pin = pin.trim(); saveEmployees(); render(); showToast('PINを変更しました'); }
+    if(e && pin && pin.trim().length>=4){ e.pin = pin.trim(); await saveEmployees(); render(); showToast('PINを変更しました'); }
     else if(pin!==null){ alert('PINは4桁以上で入力してください'); }
   }
   function adminChangePinStart(id){
@@ -236,28 +281,28 @@
     document.body.appendChild(input);
     input.click();
   }
-  function finishAdminPinChange(id, photoDataUrl){
+  async function finishAdminPinChange(id, photoDataUrl){
     const emp = STORE.employees.find(e=>e.id===id);
     if(!emp) return;
     const pin = prompt(emp.name + ' さんの新しいPIN(4桁以上)');
     if(pin===null) return;
     if(pin.trim().length<4){ alert('PINは4桁以上で入力してください'); return; }
     emp.pin = pin.trim();
-    saveEmployees();
+    await saveEmployees();
     STORE.pinLogs.unshift({ id: uid(), employeeId: id, employeeName: emp.name, adminName: state.currentAdminName || '不明', timestamp: new Date().toISOString(), photo: photoDataUrl });
-    savePinLogs();
+    await savePinLogs();
     render();
     showToast('PINを変更しました(変更記録を保存しました)');
   }
-  function deletePinLog(id){
+  async function deletePinLog(id){
     const log = STORE.pinLogs.find(l=>l.id===id);
     if(log){ log.photo = null; log.photoDeletedAt = new Date().toISOString(); }
-    savePinLogs();
+    await savePinLogs();
     render();
   }
-  function deleteRecord(id){
+  async function deleteRecord(id){
     STORE.records = STORE.records.filter(r=>r.id!==id);
-    saveRecords();
+    await saveRecords();
     render();
   }
 
@@ -310,6 +355,7 @@
 
     html += '<div class="aa-fab" id="aa-admin-btn">⚙</div>';
 
+    // modals
     if(state.modal==='action-select'){
       const emp = STORE.employees.find(e=>e.id===state.selectedEmployee);
       const type = nextTypeFor(emp.id);
@@ -541,13 +587,5 @@
 
   loadAll();
   setInterval(()=>{ if(!state.modal) render(); }, 15000);
-
-  if('serviceWorker' in navigator){
-    window.addEventListener('load', ()=>{
-      navigator.serviceWorker.register('service-worker.js').catch(()=>{});
-    });
-  }
 })();
 </script>
-</body>
-</html>

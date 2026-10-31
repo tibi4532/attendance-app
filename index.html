@@ -2,552 +2,1615 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>勤怠打刻</title>
-<link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#2f6f5e">
-<link rel="icon" href="icon-192.png">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>勤怠管理アプリ（オフライン版）</title>
 <style>
-  html,body{ margin:0; padding:0; }
-  #attendance-app, #attendance-app * { box-sizing: border-box; }
   :root{
-    --ink:#1c2b2d; --paper:#f6f4ee; --card:#ffffff; --line:#dfd9c9;
-    --accent:#2f6f5e; --accent-deep:#1f4f42; --warn:#b5482f; --muted:#6b7573;
+    --navy:#1f3a5f;
+    --navy-dark:#152943;
+    --accent:#2f7d5e;
+    --accent-dark:#245f47;
+    --danger:#b3452c;
+    --bg:#f4f6f8;
+    --card:#ffffff;
+    --border:#dfe4e9;
+    --text:#22303f;
+    --muted:#6b7a89;
   }
-  #attendance-app{
-    font-family: "Hiragino Sans","Yu Gothic UI","Noto Sans JP",system-ui,sans-serif;
-    background: var(--paper); color: var(--ink); min-height: 100vh; -webkit-tap-highlight-color: transparent;
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:"Yu Gothic UI","Meiryo",sans-serif;
+    background:var(--bg);
+    color:var(--text);
+    padding:24px;
   }
-  .aa-header{ display:flex; align-items:center; justify-content:space-between; padding: 22px 28px 18px; border-bottom: 1px solid var(--line); }
-  .aa-brand{ display:flex; flex-direction:column; gap:2px; }
-  .aa-brand .eyebrow{ font-size:12px; letter-spacing:.14em; color:var(--muted); }
-  .aa-brand h1{ margin:0; font-size:22px; font-weight:700; }
-  .aa-clock{ text-align:right; }
-  .aa-clock .time{ font-size:34px; font-weight:700; font-variant-numeric: tabular-nums; color:var(--accent-deep); line-height:1; }
-  .aa-clock .date{ font-size:13px; color:var(--muted); margin-top:4px; }
-  .aa-grid{ display:grid; grid-template-columns: repeat(auto-fill, minmax(160px,1fr)); gap: 16px; padding: 24px 28px 100px; }
-  .aa-tile{ background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 22px 14px; text-align:center; cursor:pointer; min-height: 108px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; }
-  .aa-tile:active{ transform: scale(.97); }
-  .aa-tile .name{ font-size:18px; font-weight:700; }
-  .aa-tile .status{ font-size:12px; padding:3px 10px; border-radius:100px; font-weight:600; }
-  .aa-tile .status.out{ background:#eee9db; color:var(--muted); }
-  .aa-tile .status.in{ background: rgba(47,111,94,.12); color: var(--accent-deep); }
-  .aa-empty{ padding: 60px 20px; text-align:center; color:var(--muted); }
-  .aa-fab{ position: fixed; right: 22px; bottom: 22px; width: 52px; height:52px; border-radius:50%; background: var(--card); border:1px solid var(--line); display:flex; align-items:center; justify-content:center; font-size:22px; cursor:pointer; color:var(--muted); }
-  .aa-overlay{ position: fixed; inset:0; background: rgba(28,43,45,.45); display:flex; align-items:center; justify-content:center; padding:20px; z-index:50; }
-  .aa-modal{ background: var(--card); border-radius:16px; padding:28px; width:100%; max-width:420px; max-height:86vh; overflow:auto; }
-  .aa-modal.wide{ max-width:760px; }
-  .aa-modal h2{ margin:0 0 4px; font-size:20px; }
-  .aa-modal .sub{ color:var(--muted); font-size:13px; margin-bottom:18px; }
-  .aa-btn{ display:block; width:100%; padding:16px; border-radius:10px; border:none; font-size:17px; font-weight:700; cursor:pointer; margin-top:10px; }
-  .aa-btn.primary{ background: var(--accent); color:#fff; }
-  .aa-btn.primary.out{ background: var(--warn); }
-  .aa-btn.ghost{ background: transparent; border:1px solid var(--line); color:var(--ink); }
-  .aa-btn.small{ padding:10px 14px; font-size:14px; width:auto; display:inline-block; margin:6px 6px 0 0; }
-  .aa-row{ display:flex; gap:8px; align-items:center; }
-  .aa-input{ width:100%; padding:12px 14px; border-radius:8px; border:1px solid var(--line); font-size:15px; background:#fbfaf6; margin-top:6px; }
-  .aa-label{ font-size:12px; color:var(--muted); margin-top:14px; display:block; }
-  .aa-tabs{ display:flex; gap:6px; margin-bottom:16px; border-bottom:1px solid var(--line); }
-  .aa-tab{ padding:10px 14px; cursor:pointer; font-size:14px; color:var(--muted); border-bottom:2px solid transparent; }
-  .aa-tab.active{ color:var(--accent-deep); border-color:var(--accent-deep); font-weight:700; }
-  .aa-list-item{ display:flex; align-items:center; justify-content:space-between; padding:10px 0; border-bottom:1px solid var(--line); }
-  .aa-list-item .lbl{ font-weight:600; }
-  table.aa-table{ width:100%; border-collapse:collapse; font-size:13px; }
-  table.aa-table th, table.aa-table td{ padding:8px 6px; border-bottom:1px solid var(--line); text-align:left; white-space:nowrap; }
-  table.aa-table th{ color:var(--muted); font-weight:600; }
-  .aa-del{ color:var(--warn); cursor:pointer; font-size:12px; }
-  .aa-toast{ position:fixed; left:50%; bottom:28px; transform:translateX(-50%); background: var(--accent-deep); color:#fff; padding:14px 22px; border-radius:10px; font-size:15px; font-weight:600; z-index:80; box-shadow:0 8px 20px rgba(0,0,0,.2); }
-  .aa-err{ color:var(--warn); font-size:13px; margin-top:8px; min-height:16px; }
-  .aa-filterbar{ display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap; }
-  .aa-filterbar select{ padding:8px 10px; border-radius:8px; border:1px solid var(--line); background:#fbfaf6; }
+  h1{
+    font-size:22px;
+    color:var(--navy-dark);
+    margin:0 0 4px 0;
+  }
+  .sub{
+    color:var(--muted);
+    font-size:13px;
+    margin-bottom:20px;
+  }
+  .card{
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:10px;
+    padding:20px;
+    margin-bottom:20px;
+    box-shadow:0 1px 3px rgba(0,0,0,0.04);
+  }
+  .card h2{
+    font-size:16px;
+    margin:0 0 14px 0;
+    color:var(--navy-dark);
+    border-left:4px solid var(--navy);
+    padding-left:10px;
+  }
+  table{
+    width:100%;
+    border-collapse:collapse;
+    font-size:14px;
+  }
+  th,td{
+    border-bottom:1px solid var(--border);
+    padding:10px 8px;
+    text-align:left;
+  }
+  th{
+    color:var(--muted);
+    font-weight:600;
+    font-size:12px;
+    letter-spacing:0.02em;
+  }
+  .status-pill{
+    display:inline-block;
+    padding:3px 10px;
+    border-radius:999px;
+    font-size:12px;
+    font-weight:600;
+  }
+  .st-none{background:#eceff2;color:var(--muted);}
+  .st-in{background:#e4f0ff;color:#2757a8;}
+  .st-out{background:#e6f4ed;color:var(--accent-dark);}
+  button{
+    font-family:inherit;
+    cursor:pointer;
+    border:none;
+    border-radius:6px;
+    padding:8px 14px;
+    font-size:13px;
+    font-weight:600;
+    margin-right:6px;
+  }
+  .btn-in{background:#2757a8;color:#fff;}
+  .btn-in:hover{background:#1e4685;}
+  .btn-out{background:var(--accent);color:#fff;}
+  .btn-out:hover{background:var(--accent-dark);}
+  .btn-ghost{background:#eef1f4;color:var(--text);}
+  .btn-ghost:hover{background:#e1e6eb;}
+  .btn-danger{background:var(--danger);color:#fff;}
+  .btn-danger:hover{background:#8f371f;}
+  .btn-export{background:var(--navy);color:#fff;}
+  .btn-export:hover{background:var(--navy-dark);}
+  button:disabled{background:#d7dce1 !important;color:#9aa5b1 !important;cursor:not-allowed;}
+  input[type=text], select{
+    font-family:inherit;
+    padding:7px 9px;
+    border:1px solid var(--border);
+    border-radius:6px;
+    font-size:13px;
+  }
+  .staff-row{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
+  .staff-row input{flex:1;}
+  .toolbar{display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap;}
+  .toolbar .spacer{flex:1;}
+  .offline-badge{
+    display:inline-flex;align-items:center;gap:6px;
+    background:#e6f4ed;color:var(--accent-dark);
+    padding:4px 10px;border-radius:999px;font-size:12px;font-weight:600;
+  }
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--accent);}
+  .note{font-size:12px;color:var(--muted);margin-top:8px;line-height:1.6;}
+  .modal-bg{
+    position:fixed;inset:0;background:rgba(20,30,40,0.45);
+    display:none;align-items:center;justify-content:center;z-index:50;
+  }
+  .modal{
+    background:#fff;border-radius:10px;padding:24px;max-width:360px;width:90%;
+    box-shadow:0 8px 30px rgba(0,0,0,0.2);
+  }
+  .modal h3{margin:0 0 10px 0;font-size:16px;color:var(--navy-dark);}
+  .modal p{font-size:14px;color:var(--text);line-height:1.6;white-space:pre-line;}
+  .modal .actions{display:flex;gap:10px;margin-top:18px;justify-content:flex-end;}
+  .empty{color:var(--muted);font-size:13px;padding:16px 0;text-align:center;}
+  .edit-time{width:90px;}
+
+  /* ===== 1タップ打刻用の大きな名前ボタン ===== */
+  .staff-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
+    gap:14px;
+  }
+  .staff-card{
+    display:flex;flex-direction:column;align-items:flex-start;justify-content:space-between;
+    gap:10px;min-height:130px;margin:0;padding:16px 18px;
+    border:2px solid var(--border);border-radius:14px;
+    background:#fff;color:var(--text);text-align:left;
+    font-family:inherit;cursor:pointer;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .staff-card:active{transform:scale(0.98);}
+  .staff-card .sc-name{font-size:22px;font-weight:700;color:var(--navy-dark);}
+  .staff-card .sc-status{font-size:14px;font-weight:700;}
+  .staff-card .sc-times{font-size:13px;color:var(--muted);}
+  .staff-card .sc-action{
+    align-self:stretch;text-align:center;border-radius:8px;
+    padding:8px 0;font-size:16px;font-weight:700;color:#fff;
+  }
+  .staff-card.st-none-card{border-color:#c9d3de;}
+  .staff-card.st-none-card .sc-action{background:#2757a8;}
+  .staff-card.st-in-card{border-color:#2757a8;background:#f2f7ff;}
+  .staff-card.st-in-card .sc-action{background:var(--accent);}
+  .staff-card.st-out-card{border-color:#cfe5d9;background:#f3f9f5;cursor:default;}
+  .staff-card.st-out-card .sc-action{background:#aab6b0;}
+  .staff-card.st-out-card:active{transform:none;}
+  .toast{
+    position:fixed;left:50%;bottom:24px;transform:translateX(-50%);
+    background:#22303f;color:#fff;padding:12px 16px;border-radius:10px;
+    display:flex;align-items:center;gap:14px;font-size:15px;z-index:60;
+    box-shadow:0 6px 20px rgba(0,0,0,0.3);
+  }
+  .toast button{margin:0;}
+  .modal .actions button{padding:12px 20px;font-size:15px;}
+
+  /* ===== QR読み取り ===== */
+  .scan-box{border:1px solid var(--border);border-radius:12px;padding:14px;margin:0 0 20px 0;background:#fbfcfd;}
+  .scan-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+  .scan-head .scan-title{font-weight:700;color:var(--navy-dark);font-size:16px;margin-right:auto;}
+  .scan-head button{margin:0;}
+  .scan-view{position:relative;width:100%;max-width:480px;aspect-ratio:4/3;background:#0f1720;border-radius:12px;overflow:hidden;margin:12px auto 0 auto;}
+  .scan-view video{width:100%;height:100%;object-fit:cover;display:block;}
+  .scan-frame{position:absolute;inset:12% 24%;border:3px solid rgba(255,255,255,.9);border-radius:14px;box-shadow:0 0 0 9999px rgba(0,0,0,.28);pointer-events:none;}
+  .scan-banner{position:absolute;left:10px;right:10px;bottom:10px;padding:12px 14px;border-radius:10px;font-size:18px;font-weight:700;color:#fff;text-align:center;display:none;}
+  .scan-banner.ok{background:rgba(36,95,71,.96);}
+  .scan-banner.warn{background:rgba(176,112,10,.96);}
+  .scan-banner.err{background:rgba(179,69,44,.96);}
+  .scan-hint{font-size:13px;color:var(--muted);text-align:center;margin-top:8px;min-height:1.5em;}
+
+  /* ===== QRコードの発行・印刷 ===== */
+  .qr-sheet{display:flex;flex-wrap:wrap;gap:14px;align-items:flex-start;}
+  .qr-item{border:1px dashed #9aa5b1;border-radius:4px;padding:1mm;text-align:center;background:#fff;box-sizing:border-box;}
+  .qr-item svg{display:block;width:100%;height:auto;}
+  .qr-item .qr-name{font-weight:700;margin-top:1mm;color:#000;word-break:break-all;line-height:1.2;}
+  @media print{
+    body{background:#fff;padding:0;}
+    body.printing-qr > *:not(#qrSheetWrap){display:none !important;}
+    body.printing-qr #qrSheetWrap{display:block !important;border:none;box-shadow:none;padding:0;margin:0;background:#fff;}
+    body.printing-qr .no-print{display:none !important;}
+    body.printing-qr .qr-item{break-inside:avoid;}
+  }
 </style>
 </head>
 <body>
-<div id="attendance-app"></div>
+
+<h1>勤怠管理アプリ（オフライン版）</h1>
+<div class="sub">このPC内のブラウザにのみデータを保存します。インターネット通信は一切行いません。</div>
+
+<div class="card">
+  <div class="toolbar">
+    <span class="offline-badge"><span class="dot"></span>オフライン動作中</span>
+    <span id="todayLabel" style="font-size:13px;color:var(--muted);"></span>
+    <div class="spacer"></div>
+    <button class="btn-ghost" onclick="toggleSettings()">対象者の設定</button>
+  </div>
+
+  <div id="settingsPanel" style="display:none;margin-bottom:16px;padding:14px;background:#f7f9fa;border-radius:8px;">
+    <div id="staffEditRows"></div>
+    <button class="btn-ghost" onclick="addStaffRow()">＋ 追加（最大5名）</button>
+    <button class="btn-in" onclick="saveStaffNames()">保存する</button>
+    <button class="btn-ghost" onclick="openQrSheet()">QRコードの発行・印刷</button>
+    <div class="note">氏名を変更しても過去の記録は氏名の文字列と紐づいたまま残ります。ただし、個人用QRコードは氏名から作られるため、氏名を変えたらQRコードも作り直して貼り替えてください。</div>
+  </div>
+
+  <div class="scan-box">
+    <div class="scan-head">
+      <span class="scan-title">QRコードで打刻</span>
+      <button class="btn-ghost" id="scanFlip" style="display:none" onclick="flipCamera()">カメラ切替</button>
+      <button class="btn-in" id="scanToggle" onclick="toggleScan()">カメラをオンにする</button>
+    </div>
+    <div id="scanBody" style="display:none">
+      <div class="scan-view">
+        <video id="scanVideo" playsinline muted autoplay></video>
+        <div class="scan-frame"></div>
+        <div id="scanBanner" class="scan-banner"></div>
+      </div>
+    </div>
+    <div id="scanHint" class="scan-hint">「カメラをオンにする」を押し、各自のQRコードをカメラにかざしてください（1回目で出勤、2回目で退勤）。</div>
+  </div>
+
+  <h2>本日の状況（<span id="todayDate"></span>）</h2>
+  <div class="note" style="margin:0 0 12px 0;">QRコードが使えないときは、自分の名前をタップしても打刻できます。1回目で「出勤」、2回目で「退勤」が記録されます（退勤は管理者の目視確認後に確定）。</div>
+  <div id="todayGrid" class="staff-grid"></div>
+</div>
+
+<div class="card" id="qrSheetWrap" style="display:none;">
+  <h2>QRコードの発行・印刷</h2>
+  <div class="toolbar no-print">
+    <label style="font-size:13px;color:var(--muted);">シールの一辺：</label>
+    <select id="qrSize" onchange="renderQrSheet()">
+      <option value="30">30mm</option><option value="35">35mm</option><option value="40" selected>40mm</option>
+      <option value="45">45mm</option><option value="50">50mm</option>
+    </select>
+    <div class="spacer"></div>
+    <button class="btn-export" onclick="printQrSheet()">印刷する</button>
+    <button class="btn-ghost" onclick="closeQrSheet()">閉じる</button>
+  </div>
+  <div class="note no-print" style="margin:0 0 12px 0;">
+    ご自身のカードなどに貼れるよう、点線に沿って切り取って使います。<br>
+    ・カメラに近づけられない場合や読み取りにくい場合は、大きいサイズで印刷してください（40mm以上がおすすめ）。<br>
+    ・QRコードは氏名から自動で作られるので、パソコンとタブレットのどちらで印刷しても同じコードになります（両方に同じ氏名を登録してください）。<br>
+    ・QRコードは写真に撮られるとコピーされます。他人に見せたり、貸したりしないでください。
+  </div>
+  <div id="qrSheet" class="qr-sheet"></div>
+</div>
+
+<div id="toast" class="toast" style="display:none;">
+  <span id="toastText"></span>
+  <button class="btn-ghost" id="toastUndo">取り消す</button>
+</div>
+
+<div class="card">
+  <h2>過去の記録を入力・修正</h2>
+  <div class="toolbar">
+    <label style="font-size:13px;color:var(--muted);">日付：</label>
+    <input type="date" id="pastDate" onchange="loadPastRecord()">
+    <label style="font-size:13px;color:var(--muted);">対象者：</label>
+    <select id="pastStaffSelect" onchange="loadPastRecord()"></select>
+  </div>
+  <div class="toolbar">
+    <label style="font-size:13px;color:var(--muted);">出勤時刻：</label>
+    <input type="time" id="pastInTime">
+    <label style="font-size:13px;color:var(--muted);">退勤時刻：</label>
+    <input type="time" id="pastOutTime">
+    <button class="btn-in" onclick="savePastRecord()">保存する</button>
+  </div>
+  <div class="note">
+    管理者が不在だった日など、過去の出勤・退勤時刻をあとから入力・修正できます。日付と対象者を選ぶと、すでに記録があればその内容が自動的に表示されます（空欄のまま保存すると、その項目は未記録扱いになります）。
+  </div>
+</div>
+
+<div class="card">
+  <h2>月間残業時間集計</h2>
+  <div class="toolbar">
+    <label style="font-size:13px;color:var(--muted);">対象月：</label>
+    <select id="monthFilter" onchange="renderLog()"></select>
+    <div class="spacer"></div>
+    <button class="btn-danger" id="bulkDeleteBtn" onclick="bulkDeleteMonth()">この月の記録をまとめて削除</button>
+    <button class="btn-export" onclick="exportExcel()">Excel形式で出力（.xlsx）</button>
+  </div>
+  <table>
+    <thead><tr><th>氏名</th><th>出勤日数</th><th>残業時間合計</th></tr></thead>
+    <tbody id="logBody"></tbody>
+  </table>
+  <div class="note">
+    Excel出力には、この画面には表示されない<strong>日ごとの明細（出勤・退勤時刻、日ごとの残業時間）</strong>がすべて含まれます。<br>
+    出力した .xlsx ファイルは正式なExcel形式のため、警告なくダブルクリックでそのままMicrosoft 365のExcelが開きます。<br>
+    このファイルはブラウザのローカル保存機能を使用しており、同じPC・同じブラウザで開いた場合のみ記録が保持されます。定期的に「Excel形式で出力」してバックアップを取ることをおすすめします。
+  </div>
+</div>
+
+<div class="modal-bg" id="confirmModal">
+  <div class="modal">
+    <h3 id="modalTitle">確認</h3>
+    <p id="modalBody"></p>
+    <div class="actions">
+      <button class="btn-ghost" onclick="closeModal()">キャンセル</button>
+      <button class="btn-out" id="modalConfirmBtn">確認しました</button>
+    </div>
+  </div>
+</div>
+
 <script>
+/*QRLIB-START*/
+/* ============================================================
+ * KQR : 外部ライブラリ不要の小型QRコード 作成・読み取りモジュール
+ *   - 対象は「型番1（21x21）・バイトモード」のみ（IDだけを載せる用途）
+ *   - encode(text, level)  : 文字列 → モジュール行列
+ *   - toSvg(matrix)        : 行列 → 印刷用SVG文字列
+ *   - decodeGray(g,w,h)    : グレースケール画像 → 文字列 / null
+ * ============================================================ */
+const KQR = (function(){
+'use strict';
+const N = 21;
+
+/* ---------- GF(256) / Reed-Solomon ---------- */
+const EXP = new Uint8Array(512), LOG = new Uint8Array(256);
 (function(){
-  const root = document.getElementById('attendance-app');
-  const KEY_EMP = 'aa_employees';
-  const KEY_REC = 'aa_records';
-  const KEY_PIN = 'aa_pin';
-  const KEY_PINLOG = 'aa_pinlogs';
-  const KEY_ADMINS = 'aa_admins';
-  const STORE = { employees: [], records: [], pin: '0000', pinLogs: [], admins: [] };
-  let state = { modal: null, adminAuthed:false, adminTab:'employees', selectedEmployee:null, filterMonth:null, filterEmp:'all', currentAdminName:null };
+  let x = 1;
+  for(let i=0;i<255;i++){ EXP[i]=x; LOG[x]=i; x<<=1; if(x&0x100) x^=0x11D; }
+  for(let i=255;i<512;i++) EXP[i]=EXP[i-255];
+})();
+const gmul = (a,b)=> (a&&b) ? EXP[LOG[a]+LOG[b]] : 0;
+const ginv = a => EXP[255-LOG[a]];
+const gdiv = (a,b)=> a ? EXP[(LOG[a]+255-LOG[b])%255] : 0;
+const gpow = (a,e)=> e===0 ? 1 : (a ? EXP[(LOG[a]*e)%255] : 0);
 
-  function loadAll(){
-    try{ STORE.employees = JSON.parse(localStorage.getItem(KEY_EMP) || '[]'); }catch(e){ STORE.employees = []; }
-    try{ STORE.records = JSON.parse(localStorage.getItem(KEY_REC) || '[]'); }catch(e){ STORE.records = []; }
-    try{ STORE.pinLogs = JSON.parse(localStorage.getItem(KEY_PINLOG) || '[]'); }catch(e){ STORE.pinLogs = []; }
-    try{ STORE.admins = JSON.parse(localStorage.getItem(KEY_ADMINS) || '[]'); }catch(e){ STORE.admins = []; }
-    STORE.pin = localStorage.getItem(KEY_PIN) || '0000';
-    if(STORE.admins.length===0){
-      STORE.admins = [{ id: uid(), name: '管理者(初期)', pin: STORE.pin }];
-      saveAdmins();
+const LEVELS = { L:{fmt:1,data:19,ec:7}, M:{fmt:0,data:16,ec:10}, Q:{fmt:3,data:13,ec:13}, H:{fmt:2,data:9,ec:17} };
+const LEVEL_OF_FMT = ['M','L','H','Q'];
+
+function rsDivisor(deg){
+  const r = new Array(deg).fill(0); r[deg-1]=1;
+  let root = 1;
+  for(let i=0;i<deg;i++){
+    for(let j=0;j<r.length;j++){
+      r[j] = gmul(r[j], root);
+      if(j+1<r.length) r[j] ^= r[j+1];
     }
-    render();
+    root = gmul(root,2);
   }
-  function saveEmployees(){ localStorage.setItem(KEY_EMP, JSON.stringify(STORE.employees)); }
-  function saveRecords(){ localStorage.setItem(KEY_REC, JSON.stringify(STORE.records)); }
-  function savePin(){ localStorage.setItem(KEY_PIN, STORE.pin); }
-  function savePinLogs(){ localStorage.setItem(KEY_PINLOG, JSON.stringify(STORE.pinLogs)); }
-  function saveAdmins(){ localStorage.setItem(KEY_ADMINS, JSON.stringify(STORE.admins)); }
+  return r;
+}
+function rsRemainder(data, div){
+  const res = div.map(()=>0);
+  for(const b of data){
+    const f = b ^ res.shift();
+    res.push(0);
+    div.forEach((c,i)=>{ res[i] ^= gmul(c,f); });
+  }
+  return res;
+}
+function syndromes(cw, nsym){
+  const S = new Array(nsym).fill(0);
+  let any = false;
+  for(let j=0;j<nsym;j++){
+    let s = 0; const aj = EXP[j];
+    for(let k=0;k<cw.length;k++) s = gmul(s,aj) ^ cw[k];
+    S[j] = s; if(s) any = true;
+  }
+  return {S, any};
+}
+/* 誤り訂正。成功すれば訂正後のコード語配列、失敗なら null */
+function rsCorrect(cw, nsym){
+  const n = cw.length;
+  const sy = syndromes(cw, nsym);
+  if(!sy.any) return cw.slice();
+  const S = sy.S;
+  // Berlekamp-Massey
+  let C=[1], B=[1], L=0, m=1, b=1;
+  for(let i=0;i<nsym;i++){
+    let d = S[i];
+    for(let j=1;j<=L;j++) d ^= gmul(C[j]||0, S[i-j]);
+    if(d===0){ m++; continue; }
+    const T = C.slice();
+    const coef = gmul(d, ginv(b));
+    while(C.length < B.length+m) C.push(0);
+    for(let j=0;j<B.length;j++) C[j+m] ^= gmul(coef, B[j]);
+    if(2*L <= i){ L = i+1-L; B = T; b = d; m = 1; } else { m++; }
+  }
+  if(2*L > nsym) return null;
+  // Chien search
+  const pos = [];
+  for(let i=0;i<n;i++){
+    const x = EXP[(255-i)%255];
+    let v=0, xp=1;
+    for(let j=0;j<=L;j++){ v ^= gmul(C[j]||0, xp); xp = gmul(xp,x); }
+    if(v===0) pos.push(i);
+  }
+  if(pos.length !== L) return null;
+  // Omega = S*Lambda mod x^nsym
+  const Om = new Array(nsym).fill(0);
+  for(let i=0;i<nsym;i++) for(let j=0;j<=L && j<=i;j++) Om[i] ^= gmul(C[j]||0, S[i-j]);
+  const out = cw.slice();
+  for(const i of pos){
+    const X = EXP[i], Xi = EXP[(255-i)%255];
+    let ov=0, xp=1;
+    for(let j=0;j<nsym;j++){ ov ^= gmul(Om[j], xp); xp = gmul(xp, Xi); }
+    let dv = 0;
+    for(let j=1;j<=L;j+=2) dv ^= gmul(C[j]||0, gpow(Xi, j-1));
+    if(dv===0) return null;
+    out[n-1-i] ^= gmul(X, gdiv(ov, dv));
+  }
+  if(syndromes(out, nsym).any) return null;
+  return out;
+}
 
+/* ---------- 型番1の構造 ---------- */
+const FUNC = (function(){
+  const f = []; for(let r=0;r<N;r++) f.push(new Uint8Array(N));
+  const rect = (r0,c0,h,w)=>{ for(let r=r0;r<r0+h;r++) for(let c=c0;c<c0+w;c++) f[r][c]=1; };
+  rect(0,0,9,9); rect(0,13,9,8); rect(13,0,8,9);
+  for(let i=0;i<N;i++){ f[6][i]=1; f[i][6]=1; }
+  return f;
+})();
+const ORDER = (function(){
+  const list = [];
+  for(let right=N-1; right>=1; right-=2){
+    if(right===6) right = 5;
+    for(let vert=0; vert<N; vert++){
+      for(let j=0;j<2;j++){
+        const x = right-j, upward = ((right+1)&2)===0, y = upward ? N-1-vert : vert;
+        if(!FUNC[y][x]) list.push([y,x]);
+      }
+    }
+  }
+  return list;
+})();
+if(ORDER.length !== 208) throw new Error('KQR: 内部エラー(データ領域)');
 
-  function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
-  function pad(n){ return n.toString().padStart(2,'0'); }
-  function fmtTime(d){ return pad(d.getHours())+':'+pad(d.getMinutes()); }
-  function fmtDate(d){ return d.getFullYear()+'年'+pad(d.getMonth()+1)+'月'+pad(d.getDate())+'日'; }
-  function fmtDateShort(d){ return (d.getMonth()+1)+'/'+d.getDate(); }
-  function weekday(d){ return ['日','月','火','水','木','金','土'][d.getDay()]; }
+const MASK = [
+  (r,c)=>(r+c)%2===0,
+  (r,c)=>r%2===0,
+  (r,c)=>c%3===0,
+  (r,c)=>(r+c)%3===0,
+  (r,c)=>(((r>>1)+Math.floor(c/3))%2)===0,
+  (r,c)=>((r*c)%2+(r*c)%3)===0,
+  (r,c)=>(((r*c)%2+(r*c)%3)%2)===0,
+  (r,c)=>((((r+c)%2)+((r*c)%3))%2)===0
+];
 
-  function lastRecordFor(empId){
-    const list = STORE.records.filter(r=>r.employeeId===empId).sort((a,b)=> b.timestamp.localeCompare(a.timestamp));
-    return list[0] || null;
-  }
-  function nextTypeFor(empId){
-    const last = lastRecordFor(empId);
-    return (!last || last.type==='out') ? 'in' : 'out';
-  }
-  function isLastToLeave(empId){
-    return !STORE.employees.some(e=> e.id!==empId && nextTypeFor(e.id)==='out');
-  }
+function formatBits(level, mask){
+  const data = (level<<3)|mask;
+  let rem = data;
+  for(let i=0;i<10;i++) rem = (rem<<1) ^ ((rem>>>9)*0x537);
+  return ((data<<10)|rem) ^ 0x5412;
+}
+const FMT_TABLE = [];
+for(let d=0; d<32; d++) FMT_TABLE.push(formatBits(d>>3, d&7));
 
-  function showToast(msg){
-    let t = document.createElement('div');
-    t.className='aa-toast'; t.textContent = msg;
-    document.body.appendChild(t);
-    setTimeout(()=>t.remove(), 2200);
-  }
+function newMatrix(){ const m=[]; for(let r=0;r<N;r++) m.push(new Uint8Array(N)); return m; }
 
-  function punch(empId){
-    const emp = STORE.employees.find(e=>e.id===empId);
-    if(!emp) return;
-    const type = nextTypeFor(empId);
-    const now = new Date();
-    STORE.records.push({ id: uid(), employeeId: empId, name: emp.name, type, timestamp: now.toISOString() });
-    saveRecords();
-    state.modal = 'done';
-    state.doneInfo = { name: emp.name, type, time: fmtTime(now) };
-    render();
-    if(state.doneTimer) clearTimeout(state.doneTimer);
-    state.doneTimer = setTimeout(()=>{ state.modal=null; state.doneInfo=null; render(); }, 1500);
-  }
+function drawFixed(m){
+  for(let i=0;i<N;i++){ m[6][i] = (i%2===0)?1:0; m[i][6] = (i%2===0)?1:0; }
+  const finder = (cx,cy)=>{
+    for(let dy=-4;dy<=4;dy++) for(let dx=-4;dx<=4;dx++){
+      const d = Math.max(Math.abs(dx),Math.abs(dy)), x=cx+dx, y=cy+dy;
+      if(x>=0&&x<N&&y>=0&&y<N) m[y][x] = (d!==2 && d!==4) ? 1 : 0;
+    }
+  };
+  finder(3,3); finder(N-4,3); finder(3,N-4);
+}
+function drawFormat(m, bits){
+  const set = (x,y,i)=>{ m[y][x] = (bits>>>i)&1; };
+  for(let i=0;i<=5;i++) set(8,i,i);
+  set(8,7,6); set(8,8,7); set(7,8,8);
+  for(let i=9;i<15;i++) set(14-i,8,i);
+  for(let i=0;i<8;i++) set(N-1-i,8,i);
+  for(let i=8;i<15;i++) set(8,N-15+i,i);
+  m[N-8][8] = 1;
+}
 
-  function openPunchModal(empId){ state.selectedEmployee = empId; state.modal='action-select'; render(); }
-  function goToPinEntry(){ state.modal='pin-entry'; state.pinAttempt=''; state.pinErr=''; render(); }
-  function tryEmpPin(){
-    const emp = STORE.employees.find(e=>e.id===state.selectedEmployee);
-    if(emp && state.pinAttempt === emp.pin){ punch(state.selectedEmployee); }
-    else{ state.pinErr='PINが違います'; render(); }
+/* ---------- 作成 ---------- */
+function penalty(m){
+  let res = 0;
+  for(let dir=0;dir<2;dir++){
+    for(let a=0;a<N;a++){
+      let run = 1;
+      for(let b=1;b<N;b++){
+        const cur = dir ? m[b][a] : m[a][b], prev = dir ? m[b-1][a] : m[a][b-1];
+        if(cur===prev) run++; else { if(run>=5) res += 3+(run-5); run = 1; }
+      }
+      if(run>=5) res += 3+(run-5);
+    }
   }
-  function goToPinChangeVerify(){ state.modal='pinchange-verify'; state.oldPinAttempt=''; state.pinChangeErr=''; render(); }
-  function tryOldPin(){
-    const emp = STORE.employees.find(e=>e.id===state.selectedEmployee);
-    if(emp && state.oldPinAttempt === emp.pin){ state.modal='pinchange-new'; state.newPin1=''; state.newPin2=''; state.pinChangeErr=''; render(); }
-    else{ state.pinChangeErr='現在のPINが違います'; render(); }
+  for(let y=0;y<N-1;y++) for(let x=0;x<N-1;x++){
+    const c = m[y][x];
+    if(c===m[y][x+1] && c===m[y+1][x] && c===m[y+1][x+1]) res += 3;
   }
-  function submitNewPin(){
-    if(!state.newPin1 || state.newPin1.length<4){ state.pinChangeErr='PINは4桁以上で入力してください'; render(); return; }
-    if(state.newPin1 !== state.newPin2){ state.pinChangeErr='新しいPINが一致しません'; render(); return; }
-    changeEmployeePin(state.selectedEmployee, state.newPin1);
-    state.modal = null;
-    render();
+  const A=[1,0,1,1,1,0,1,0,0,0,0], B=[0,0,0,0,1,0,1,1,1,0,1];
+  for(let dir=0;dir<2;dir++) for(let a=0;a<N;a++) for(let s=0;s<=N-11;s++){
+    let okA=true, okB=true;
+    for(let k=0;k<11;k++){
+      const v = dir ? m[s+k][a] : m[a][s+k];
+      if(v!==A[k]) okA=false;
+      if(v!==B[k]) okB=false;
+    }
+    if(okA) res += 40;
+    if(okB) res += 40;
   }
-  function closeModal(){ state.modal=null; state.adminAuthed=false; render(); }
+  let dark = 0; for(let y=0;y<N;y++) for(let x=0;x<N;x++) dark += m[y][x];
+  const total = N*N;
+  const k = Math.ceil(Math.abs(dark*20 - total*10)/total) - 1;
+  res += Math.max(0,k)*10;
+  return res;
+}
 
-  function openAdmin(){ state.modal='admin-login'; state.pinInput=''; state.err=''; render(); }
-  function tryPin(){
-    const admin = STORE.admins.find(a=>a.pin === state.pinInput);
-    if(admin){ state.adminAuthed=true; state.currentAdminName = admin.name; state.currentAdminId = admin.id; state.modal='admin'; state.adminTab='employees'; state.err=''; }
-    else{ state.err='暗証番号が違います'; }
-    render();
+function encode(text, level){
+  level = level || 'Q';
+  const L = LEVELS[level];
+  const bytes = [];
+  for(const ch of String(text)){
+    const c = ch.charCodeAt(0);
+    if(c>255) throw new Error('KQR: 英数字記号のみ使えます');
+    bytes.push(c);
   }
-  function addAdmin(name, pin){
-    if(!name || !name.trim()){ state.adminAddErr='名前を入力してください'; render(); return; }
-    if(!pin || pin.length<4){ state.adminAddErr='PINは4桁以上で設定してください'; render(); return; }
-    STORE.admins.push({ id: uid(), name: name.trim(), pin: pin.trim() });
-    state.adminAddErr='';
-    saveAdmins();
-    render();
-  }
-  function removeAdmin(id){
-    if(STORE.admins.length<=1){ alert('最後の1人は削除できません'); return; }
-    STORE.admins = STORE.admins.filter(a=>a.id!==id);
-    saveAdmins();
-    render();
-  }
-  function changeAdminPin(id, pin){
-    const a = STORE.admins.find(a=>a.id===id);
-    if(a && pin && pin.trim().length>=4){ a.pin = pin.trim(); saveAdmins(); render(); showToast('PINを変更しました'); }
-    else if(pin!==null){ alert('PINは4桁以上で入力してください'); }
-  }
+  const bits = [];
+  const put = (v,n)=>{ for(let i=n-1;i>=0;i--) bits.push((v>>>i)&1); };
+  put(4,4); put(bytes.length,8); bytes.forEach(b=>put(b,8));
+  const cap = L.data*8;
+  if(bits.length > cap) throw new Error('KQR: 文字数が多すぎます(最大'+Math.floor((cap-12)/8)+'文字)');
+  put(0, Math.min(4, cap-bits.length));
+  while(bits.length%8) bits.push(0);
+  const data = [];
+  for(let i=0;i<bits.length;i+=8){ let v=0; for(let k=0;k<8;k++) v=(v<<1)|bits[i+k]; data.push(v); }
+  for(let pad=0xEC; data.length<L.data; pad ^= (0xEC^0x11)) data.push(pad);
+  const all = data.concat(rsRemainder(data, rsDivisor(L.ec)));
 
-  function addEmployee(name, pin){
-    if(!name.trim()) { state.addErr='氏名を入力してください'; render(); return; }
-    if(!pin || pin.length<4){ state.addErr='PINは4桁以上で設定してください'; render(); return; }
-    STORE.employees.push({ id: uid(), name: name.trim(), pin: pin.trim() });
-    state.addErr='';
-    saveEmployees();
-    render();
-  }
-  function removeEmployee(id){
-    STORE.employees = STORE.employees.filter(e=>e.id!==id);
-    saveEmployees();
-    render();
-  }
-  function renameEmployee(id, name){
-    const e = STORE.employees.find(e=>e.id===id);
-    if(e && name.trim()){ e.name = name.trim(); saveEmployees(); render(); }
-  }
-  function changeEmployeePin(id, pin){
-    const e = STORE.employees.find(e=>e.id===id);
-    if(e && pin && pin.trim().length>=4){ e.pin = pin.trim(); saveEmployees(); render(); showToast('PINを変更しました'); }
-    else if(pin!==null){ alert('PINは4桁以上で入力してください'); }
-  }
-  function adminChangePinStart(id){
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'image/*';
-    input.capture = 'user';
-    input.style.display = 'none';
-    input.onchange = (e)=>{
-      const file = e.target.files && e.target.files[0];
-      if(input.parentNode) document.body.removeChild(input);
-      if(!file){ return; }
-      const reader = new FileReader();
-      reader.onload = (ev)=>{
-        const img = new Image();
-        img.onload = ()=>{
-          const size = 200;
-          const canvas = document.createElement('canvas');
-          canvas.width = size; canvas.height = size;
-          const ctx = canvas.getContext('2d');
-          const s = Math.min(img.width, img.height);
-          const sx = (img.width - s)/2, sy = (img.height - s)/2;
-          ctx.drawImage(img, sx, sy, s, s, 0, 0, size, size);
-          const dataUrl = canvas.toDataURL('image/jpeg', 0.5);
-          finishAdminPinChange(id, dataUrl);
-        };
-        img.src = ev.target.result;
-      };
-      reader.readAsDataURL(file);
-    };
-    document.body.appendChild(input);
-    input.click();
-  }
-  function finishAdminPinChange(id, photoDataUrl){
-    const emp = STORE.employees.find(e=>e.id===id);
-    if(!emp) return;
-    const pin = prompt(emp.name + ' さんの新しいPIN(4桁以上)');
-    if(pin===null) return;
-    if(pin.trim().length<4){ alert('PINは4桁以上で入力してください'); return; }
-    emp.pin = pin.trim();
-    saveEmployees();
-    STORE.pinLogs.unshift({ id: uid(), employeeId: id, employeeName: emp.name, adminName: state.currentAdminName || '不明', timestamp: new Date().toISOString(), photo: photoDataUrl });
-    savePinLogs();
-    render();
-    showToast('PINを変更しました(変更記録を保存しました)');
-  }
-  function deletePinLog(id){
-    const log = STORE.pinLogs.find(l=>l.id===id);
-    if(log){ log.photo = null; log.photoDeletedAt = new Date().toISOString(); }
-    savePinLogs();
-    render();
-  }
-  function deleteRecord(id){
-    STORE.records = STORE.records.filter(r=>r.id!==id);
-    saveRecords();
-    render();
-  }
-
-  function monthsAvailable(){
-    const set = new Set(STORE.records.map(r=> r.timestamp.slice(0,7)));
-    const now = new Date();
-    set.add(now.getFullYear()+'-'+pad(now.getMonth()+1));
-    return Array.from(set).sort().reverse();
-  }
-
-  function exportCSV(){
-    const month = state.filterMonth || monthsAvailable()[0];
-    let rows = STORE.records.filter(r=> r.timestamp.startsWith(month));
-    if(state.filterEmp !== 'all') rows = rows.filter(r=>r.employeeId===state.filterEmp);
-    rows = rows.sort((a,b)=> a.timestamp.localeCompare(b.timestamp));
-    let csv = '\uFEFF氏名,種別,日付,時刻\n';
-    rows.forEach(r=>{
-      const d = new Date(r.timestamp);
-      csv += [r.name, r.type==='in'?'出勤':'退勤', fmtDate(d), fmtTime(d)].join(',') + '\n';
+  let best = null, bestPen = Infinity;
+  for(let mask=0; mask<8; mask++){
+    const m = newMatrix();
+    drawFixed(m);
+    ORDER.forEach(([r,c],i)=>{
+      let bit = (all[i>>>3] >>> (7-(i&7))) & 1;
+      if(MASK[mask](r,c)) bit ^= 1;
+      m[r][c] = bit;
     });
-    const blob = new Blob([csv], {type:'text/csv'});
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = '勤怠_' + month + '.csv';
-    document.body.appendChild(a); a.click(); a.remove();
-    URL.revokeObjectURL(url);
+    drawFormat(m, formatBits(L.fmt, mask));
+    const p = penalty(m);
+    if(p < bestPen){ bestPen = p; best = m; }
   }
+  return best;
+}
 
-  function render(){
-    const now = new Date();
-    let html = '';
-    html += '<div class="aa-header"><div class="aa-brand"><span class="eyebrow">ATTENDANCE</span><h1>勤怠打刻</h1></div>'
-      + '<div class="aa-clock"><div class="time">'+fmtTime(now)+'</div><div class="date">'+fmtDate(now)+'（'+weekday(now)+'）</div></div></div>';
+function toSvg(m, opt){
+  opt = opt || {};
+  const quiet = opt.quiet===undefined ? 4 : opt.quiet;
+  const size = N + quiet*2;
+  let d = '';
+  for(let y=0;y<N;y++) for(let x=0;x<N;x++) if(m[y][x]) d += 'M'+(x+quiet)+' '+(y+quiet)+'h1v1h-1z';
+  return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 '+size+' '+size+'" shape-rendering="crispEdges">'
+       + '<rect width="'+size+'" height="'+size+'" fill="#fff"/><path d="'+d+'" fill="#000"/></svg>';
+}
 
-    if(STORE.employees.length===0){
-      html += '<div class="aa-empty">従業員が登録されていません。<br>右下の設定ボタンから管理者ログインし、従業員を登録してください。</div>';
-    } else {
-      html += '<div class="aa-grid">';
-      STORE.employees.forEach(emp=>{
-        const t = nextTypeFor(emp.id);
-        const statusLabel = t==='in' ? '未出勤' : '出勤中';
-        const statusClass = t==='in' ? 'out' : 'in';
-        html += '<div class="aa-tile" data-punch="'+emp.id+'">'
-          + '<div class="name">'+escapeHtml(emp.name)+'</div>'
-          + '<div class="status '+statusClass+'">'+statusLabel+'</div>'
-          + '</div>';
-      });
-      html += '</div>';
+/* ---------- 読み取り：行列 → 文字列 ---------- */
+const popcnt = x => { let c=0; while(x){ c+=x&1; x>>>=1; } return c; };
+function readFormat(m){
+  let a=0, b=0;
+  const g = (x,y)=> m[y][x] ? 1 : 0;
+  for(let i=0;i<=5;i++) a |= g(8,i)<<i;
+  a |= g(8,7)<<6; a |= g(8,8)<<7; a |= g(7,8)<<8;
+  for(let i=9;i<15;i++) a |= g(14-i,8)<<i;
+  for(let i=0;i<8;i++) b |= g(N-1-i,8)<<i;
+  for(let i=8;i<15;i++) b |= g(8,N-15+i)<<i;
+  let best=null, bd=99;
+  for(const v of [a,b]) for(let d=0;d<32;d++){
+    const dist = popcnt(v ^ FMT_TABLE[d]);
+    if(dist<bd){ bd=dist; best=d; }
+  }
+  return bd<=3 ? best : null;
+}
+function decodeMatrix(m){
+  const d = readFormat(m);
+  if(d===null) return null;
+  const lvl = LEVELS[LEVEL_OF_FMT[d>>3]], mask = d&7;
+  const bytes = new Array(26).fill(0);
+  ORDER.forEach(([r,c],i)=>{
+    let bit = m[r][c] ? 1 : 0;
+    if(MASK[mask](r,c)) bit ^= 1;
+    bytes[i>>>3] |= bit << (7-(i&7));
+  });
+  const cw = rsCorrect(bytes, lvl.ec);
+  if(!cw) return null;
+  const data = cw.slice(0, lvl.data);
+  let pos = 0;
+  const rd = n=>{ let v=0; for(let i=0;i<n;i++){ v=(v<<1)|((data[pos>>>3]>>>(7-(pos&7)))&1); pos++; } return v; };
+  if(rd(4)!==4) return null;
+  const cnt = rd(8);
+  if(12+cnt*8 > lvl.data*8) return null;
+  let s = '';
+  for(let i=0;i<cnt;i++) s += String.fromCharCode(rd(8));
+  return s;
+}
+function transpose(m){
+  const t = newMatrix();
+  for(let y=0;y<N;y++) for(let x=0;x<N;x++) t[x][y] = m[y][x];
+  return t;
+}
+
+/* ---------- 読み取り：画像 → 行列 ---------- */
+function otsuThreshold(g){
+  const hist = new Uint32Array(256);
+  for(let i=0;i<g.length;i++) hist[g[i]]++;
+  const total = g.length;
+  let sum=0; for(let i=0;i<256;i++) sum += i*hist[i];
+  let sumB=0, wB=0, best=0, thr=128;
+  for(let t=0;t<256;t++){
+    wB += hist[t]; if(!wB) continue;
+    const wF = total-wB; if(!wF) break;
+    sumB += t*hist[t];
+    const mB = sumB/wB, mF = (sum-sumB)/wF;
+    const v = wB*wF*(mB-mF)*(mB-mF);
+    if(v>best){ best=v; thr=t; }
+  }
+  return thr;
+}
+function binarizeGlobal(g,w,h){
+  const t = otsuThreshold(g), out = new Uint8Array(w*h);
+  for(let i=0;i<out.length;i++) out[i] = g[i] <= t ? 1 : 0;
+  return out;
+}
+function binarizeAdaptive(g,w,h){
+  const W = w+1, I = new Uint32Array(W*(h+1));
+  for(let y=0;y<h;y++){
+    let row=0;
+    for(let x=0;x<w;x++){ row += g[y*w+x]; I[(y+1)*W+x+1] = I[y*W+x+1] + row; }
+  }
+  const r = Math.max(6, Math.round(w/10)), out = new Uint8Array(w*h);
+  for(let y=0;y<h;y++){
+    const y0=Math.max(0,y-r), y1=Math.min(h,y+r+1);
+    for(let x=0;x<w;x++){
+      const x0=Math.max(0,x-r), x1=Math.min(w,x+r+1);
+      const area=(x1-x0)*(y1-y0);
+      const s = I[y1*W+x1]-I[y0*W+x1]-I[y1*W+x0]+I[y0*W+x0];
+      out[y*w+x] = (g[y*w+x]*area*100 < s*88) ? 1 : 0;
     }
+  }
+  return out;
+}
 
-    html += '<div class="aa-fab" id="aa-admin-btn">⚙</div>';
-
-    if(state.modal==='action-select'){
-      const emp = STORE.employees.find(e=>e.id===state.selectedEmployee);
-      const type = nextTypeFor(emp.id);
-      html += '<div class="aa-overlay" id="aa-overlay"><div class="aa-modal">'
-        + '<h2>'+escapeHtml(emp.name)+' さん</h2>'
-        + '<div class="sub">操作を選んでください</div>'
-        + '<button class="aa-btn primary '+(type==='out'?'out':'')+'" id="aa-goto-punch">'+(type==='in'?'出勤する':'退勤する')+'</button>'
-        + '<button class="aa-btn ghost" id="aa-goto-pinchange">PINの変更</button>'
-        + '<button class="aa-btn ghost" id="aa-cancel">キャンセル</button>'
-        + '</div></div>';
-    }
-
-    if(state.modal==='checklist'){
-      const emp = STORE.employees.find(e=>e.id===state.selectedEmployee);
-      html += '<div class="aa-overlay" id="aa-overlay"><div class="aa-modal">'
-        + '<h2>最終退勤者の確認</h2>'
-        + '<div class="sub">'+escapeHtml(emp.name)+' さんが本日最後の退勤者です。以下を確認してください。</div>'
-        + '<ul style="text-align:left;padding-left:22px;margin:14px 0;line-height:1.9;font-size:14px;">'
-        + '<li>会議室の窓の施錠・エアコンの停止</li>'
-        + '<li>管理区域の施錠</li>'
-        + '<li>事務室内扉の施錠(2か所)</li>'
-        + '<li>事務室内書類棚の施錠</li>'
-        + '<li>事務室内エアコン(3か所)の停止</li>'
-        + '<li>サーキュレーターの停止</li>'
-        + '</ul>'
-        + '<button class="aa-btn primary" id="aa-checklist-ok">確認しました</button>'
-        + '<button class="aa-btn ghost" id="aa-cancel">キャンセル</button>'
-        + '</div></div>';
-    }
-
-    if(state.modal==='pin-entry'){
-      const emp = STORE.employees.find(e=>e.id===state.selectedEmployee);
-      const type = nextTypeFor(emp.id);
-      html += '<div class="aa-overlay" id="aa-overlay"><div class="aa-modal">'
-        + '<h2>'+escapeHtml(emp.name)+' さん</h2>'
-        + '<div class="sub">'+(type==='in'?'出勤':'退勤')+'の記録には本人のPINが必要です</div>'
-        + '<input class="aa-input" id="aa-emp-pin-input" type="password" inputmode="numeric" placeholder="PIN" value="'+(state.pinAttempt||'')+'">'
-        + '<div class="aa-err">'+(state.pinErr||'')+'</div>'
-        + '<button class="aa-btn primary '+(type==='out'?'out':'')+'" id="aa-emp-pin-submit">確定</button>'
-        + '<button class="aa-btn ghost" id="aa-cancel">キャンセル</button>'
-        + '</div></div>';
-    }
-
-    if(state.modal==='pinchange-verify'){
-      const emp = STORE.employees.find(e=>e.id===state.selectedEmployee);
-      html += '<div class="aa-overlay" id="aa-overlay"><div class="aa-modal">'
-        + '<h2>'+escapeHtml(emp.name)+' さん</h2>'
-        + '<div class="sub">現在のPINを入力してください</div>'
-        + '<input class="aa-input" id="aa-oldpin-input" type="password" inputmode="numeric" placeholder="現在のPIN" value="'+(state.oldPinAttempt||'')+'">'
-        + '<div class="aa-err">'+(state.pinChangeErr||'')+'</div>'
-        + '<button class="aa-btn primary" id="aa-oldpin-submit">次へ</button>'
-        + '<button class="aa-btn ghost" id="aa-cancel">キャンセル</button>'
-        + '</div></div>';
-    }
-
-    if(state.modal==='pinchange-new'){
-      const emp = STORE.employees.find(e=>e.id===state.selectedEmployee);
-      html += '<div class="aa-overlay" id="aa-overlay"><div class="aa-modal">'
-        + '<h2>新しいPINを設定</h2>'
-        + '<div class="sub">'+escapeHtml(emp.name)+' さんの新しいPIN(4桁以上)を入力してください</div>'
-        + '<input class="aa-input" id="aa-newpin1-input" type="password" inputmode="numeric" placeholder="新しいPIN" value="'+(state.newPin1||'')+'">'
-        + '<input class="aa-input" id="aa-newpin2-input" type="password" inputmode="numeric" placeholder="新しいPIN(確認)" value="'+(state.newPin2||'')+'">'
-        + '<div class="aa-err">'+(state.pinChangeErr||'')+'</div>'
-        + '<button class="aa-btn primary" id="aa-newpin-submit">変更する</button>'
-        + '<button class="aa-btn ghost" id="aa-cancel">キャンセル</button>'
-        + '</div></div>';
-    }
-
-    if(state.modal==='done'){
-      const info = state.doneInfo;
-      html += '<div class="aa-overlay"><div class="aa-modal" style="text-align:center;">'
-        + '<div style="font-size:46px;color:var(--accent-deep);">✓</div>'
-        + '<h2>'+escapeHtml(info.name)+'さん '+(info.type==='in'?'出勤':'退勤')+'</h2>'
-        + '<div class="sub">'+info.time+' に記録しました</div>'
-        + '</div></div>';
-    }
-
-    if(state.modal==='admin-login'){
-      html += '<div class="aa-overlay" id="aa-overlay"><div class="aa-modal">'
-        + '<h2>管理者ログイン</h2><div class="sub">暗証番号を入力してください（初期値: 0000）</div>'
-        + '<input class="aa-input" id="aa-pin-input" type="password" inputmode="numeric" placeholder="暗証番号" value="'+(state.pinInput||'')+'">'
-        + '<div class="aa-err">'+(state.err||'')+'</div>'
-        + '<button class="aa-btn primary" id="aa-pin-submit">ログイン</button>'
-        + '<button class="aa-btn ghost" id="aa-cancel">閉じる</button>'
-        + '</div></div>';
-    }
-
-    if(state.modal==='admin' && state.adminAuthed){
-      html += '<div class="aa-overlay" id="aa-overlay"><div class="aa-modal wide">'
-        + '<h2>管理者画面</h2>'
-        + '<div class="aa-tabs">'
-        + tabBtn('employees','従業員管理') + tabBtn('records','勤怠データ') + tabBtn('pinlogs','PIN変更履歴') + tabBtn('settings','設定')
-        + '</div>';
-
-      if(state.adminTab==='employees'){
-        html += '<div class="aa-row"><input class="aa-input" id="aa-new-emp" placeholder="従業員名"></div>'
-          + '<div class="aa-row"><input class="aa-input" id="aa-new-emp-pin" type="text" inputmode="numeric" placeholder="PIN(4桁以上)"><button class="aa-btn small primary" id="aa-add-emp">追加</button></div>'
-          + '<div class="aa-err">'+(state.addErr||'')+'</div>';
-        html += '<div style="margin-top:16px;">';
-        STORE.employees.forEach(e=>{
-          html += '<div class="aa-list-item"><span class="lbl">'+escapeHtml(e.name)+'</span>'
-            + '<span><span class="aa-del" data-rename="'+e.id+'" style="margin-right:10px;color:var(--accent-deep);">名前変更</span>'
-            + '<span class="aa-del" data-pinchange="'+e.id+'" style="margin-right:10px;color:var(--accent-deep);">PIN変更</span>'
-            + '<span class="aa-del" data-remove="'+e.id+'">削除</span></span></div>';
-        });
-        if(STORE.employees.length===0) html += '<div class="sub">従業員がいません</div>';
-        html += '</div>';
-      }
-
-      if(state.adminTab==='records'){
-        const months = monthsAvailable();
-        if(!state.filterMonth) state.filterMonth = months[0];
-        html += '<div class="aa-filterbar">'
-          + '<select id="aa-filter-month">' + months.map(m=>'<option value="'+m+'" '+(m===state.filterMonth?'selected':'')+'>'+m+'</option>').join('') + '</select>'
-          + '<select id="aa-filter-emp"><option value="all">全員</option>' + STORE.employees.map(e=>'<option value="'+e.id+'" '+(state.filterEmp===e.id?'selected':'')+'>'+escapeHtml(e.name)+'</option>').join('') + '</select>'
-          + '<button class="aa-btn small primary" id="aa-export">CSVエクスポート</button>'
-          + '</div>';
-        let rows = STORE.records.filter(r=> r.timestamp.startsWith(state.filterMonth));
-        if(state.filterEmp!=='all') rows = rows.filter(r=>r.employeeId===state.filterEmp);
-        rows = rows.sort((a,b)=> b.timestamp.localeCompare(a.timestamp));
-        html += '<table class="aa-table"><thead><tr><th>氏名</th><th>種別</th><th>日付</th><th>時刻</th><th></th></tr></thead><tbody>';
-        rows.forEach(r=>{
-          const d = new Date(r.timestamp);
-          html += '<tr><td>'+escapeHtml(r.name)+'</td><td>'+(r.type==='in'?'出勤':'退勤')+'</td><td>'+fmtDateShort(d)+'('+weekday(d)+')</td><td>'+fmtTime(d)+'</td>'
-            + '<td><span class="aa-del" data-delrecord="'+r.id+'">削除</span></td></tr>';
-        });
-        if(rows.length===0) html += '<tr><td colspan="5" class="sub">データがありません</td></tr>';
-        html += '</tbody></table>';
-      }
-
-      if(state.adminTab==='pinlogs'){
-        html += '<div class="sub">管理者画面からPINを変更した際の記録です(自己変更は含まれません)</div>';
-        if(STORE.pinLogs.length===0){
-          html += '<div class="sub">記録はまだありません</div>';
-        } else {
-          STORE.pinLogs.forEach(log=>{
-            const d = new Date(log.timestamp);
-            html += '<div class="aa-list-item" style="align-items:center;">'
-              + (log.photo
-                  ? '<img src="'+log.photo+'" style="width:52px;height:52px;border-radius:8px;object-fit:cover;margin-right:12px;">'
-                  : '<div style="width:52px;height:52px;border-radius:8px;background:#eee9db;color:var(--muted);font-size:10px;display:flex;align-items:center;justify-content:center;text-align:center;margin-right:12px;">写真<br>削除済</div>')
-              + '<span class="lbl" style="flex:1;">'+escapeHtml(log.employeeName)+' さんのPIN変更<br><span class="sub" style="margin:0;">操作者: '+escapeHtml(log.adminName||'不明')+'</span></span>'
-              + '<span class="sub" style="margin:0 10px 0 0;">'+fmtDateShort(d)+'('+weekday(d)+') '+fmtTime(d)+'</span>'
-              + (log.photo ? '<span class="aa-del" data-delpinlog="'+log.id+'">写真を削除</span>' : '')
-              + '</div>';
-          });
+/* 一直線上の 暗-明-暗-明-暗 = 1:1:3:1:1 を確認し、中心位置と1モジュールの大きさを返す */
+function crossCheck(bin,w,h,x,y,dx,dy){
+  const at = i=>{ const xx=x+dx*i, yy=y+dy*i; return (xx<0||yy<0||xx>=w||yy>=h) ? 2 : bin[yy*w+xx]; };
+  if(at(0)!==1) return null;
+  const bk=[0,0,0], fw=[0,0,0];
+  let p=0;
+  for(let run=0;run<3;run++){
+    const col = run%2===0 ? 1 : 0;
+    while(at(p)===col){ bk[run]++; p--; if(bk[run]>w+h) return null; }
+    if(bk[run]===0) return null;
+    if(run<2 && at(p)===2) return null;
+  }
+  p=1;
+  for(let run=0;run<3;run++){
+    const col = run%2===0 ? 1 : 0;
+    while(at(p)===col){ fw[run]++; p++; if(fw[run]>w+h) return null; }
+    if(run>0 && fw[run]===0) return null;
+    if(run<2 && at(p)===2) return null;
+  }
+  const L = [bk[2], bk[1], bk[0]+fw[0], fw[1], fw[2]];
+  const total = L[0]+L[1]+L[2]+L[3]+L[4];
+  const ms = total/7;
+  if(ms < 1.5) return null;
+  const v = ms*0.55;
+  if(Math.abs(L[0]-ms)>v || Math.abs(L[1]-ms)>v || Math.abs(L[2]-3*ms)>3*v || Math.abs(L[3]-ms)>v || Math.abs(L[4]-ms)>v) return null;
+  const t = (-bk[0]+1+fw[0])/2;
+  return { x:x+dx*t, y:y+dy*t, ms };
+}
+function findFinders(bin,w,h){
+  const cands = [];
+  const runLen=[], runStart=[], runCol=[];
+  for(let y=0;y<h;y++){
+    runLen.length=0; runStart.length=0; runCol.length=0;
+    let cur = bin[y*w], start=0;
+    for(let x=1;x<=w;x++){
+      const v = x<w ? bin[y*w+x] : -1;
+      if(v!==cur){
+        runLen.push(x-start); runStart.push(start); runCol.push(cur);
+        start = x; cur = v;
+        const k = runLen.length-1;
+        if(k>=4 && runCol[k-4]===1){
+          const total = runLen[k]+runLen[k-1]+runLen[k-2]+runLen[k-3]+runLen[k-4];
+          const ms = total/7;
+          if(ms>=1.5){
+            const v1 = ms*0.7;
+            if(Math.abs(runLen[k-4]-ms)<v1 && Math.abs(runLen[k-3]-ms)<v1 && Math.abs(runLen[k-2]-3*ms)<3*v1 && Math.abs(runLen[k-1]-ms)<v1 && Math.abs(runLen[k]-ms)<v1){
+              const cx = runStart[k-2] + (runLen[k-2]-1)/2;
+              const vc = crossCheck(bin,w,h,Math.round(cx),y,0,1);
+              if(vc){
+                const hc = crossCheck(bin,w,h,Math.round(cx),Math.round(vc.y),1,0);
+                if(hc && Math.abs(hc.ms-vc.ms) < 0.6*Math.max(hc.ms,vc.ms)){
+                  const fx = hc.x, fy = vc.y, fms = (hc.ms+vc.ms)/2;
+                  let merged = false;
+                  for(const c of cands){
+                    if(Math.abs(c.x-fx)<Math.max(fms,c.ms)*1.5 && Math.abs(c.y-fy)<Math.max(fms,c.ms)*1.5){
+                      c.x=(c.x*c.n+fx)/(c.n+1); c.y=(c.y*c.n+fy)/(c.n+1); c.ms=(c.ms*c.n+fms)/(c.n+1); c.n++;
+                      merged = true; break;
+                    }
+                  }
+                  if(!merged) cands.push({x:fx,y:fy,ms:fms,n:1});
+                }
+              }
+            }
+          }
         }
       }
-
-      if(state.adminTab==='settings'){
-        html += '<span class="aa-label">管理者一覧(それぞれ個別のPINを持ちます)</span>';
-        STORE.admins.forEach(a=>{
-          html += '<div class="aa-list-item"><span class="lbl">'+escapeHtml(a.name)+'</span>'
-            + '<span><span class="aa-del" data-adminpinchange="'+a.id+'" style="margin-right:10px;color:var(--accent-deep);">PIN変更</span>'
-            + '<span class="aa-del" data-adminremove="'+a.id+'">削除</span></span></div>';
-        });
-        html += '<div class="aa-row" style="margin-top:14px;"><input class="aa-input" id="aa-new-admin-name" placeholder="管理者名(例:理事長)"></div>'
-          + '<div class="aa-row"><input class="aa-input" id="aa-new-admin-pin" type="text" inputmode="numeric" placeholder="PIN(4桁以上)"><button class="aa-btn small primary" id="aa-add-admin">追加</button></div>'
-          + '<div class="aa-err">'+(state.adminAddErr||'')+'</div>';
-      }
-
-      html += '<button class="aa-btn ghost" id="aa-cancel" style="margin-top:20px;">閉じる</button>';
-      html += '</div></div>';
     }
-
-    root.innerHTML = html;
-    attachHandlers();
   }
-
-  function tabBtn(key,label){
-    return '<div class="aa-tab '+(state.adminTab===key?'active':'')+'" data-tab="'+key+'">'+label+'</div>';
+  return cands.filter(c=>c.n>=2).sort((a,b)=>b.n-a.n).slice(0,9);
+}
+/* 3つのファインダの組から「左上・右上・左下」を決め、スコア順に返す */
+function triples(c){
+  const out = [];
+  for(let i=0;i<c.length;i++) for(let j=i+1;j<c.length;j++) for(let k=j+1;k<c.length;k++){
+    const P=[c[i],c[j],c[k]];
+    const ms = (P[0].ms+P[1].ms+P[2].ms)/3;
+    if(Math.max(P[0].ms,P[1].ms,P[2].ms)/Math.min(P[0].ms,P[1].ms,P[2].ms) > 1.7) continue;
+    for(let a=0;a<3;a++){
+      const A=P[a], Q=P[(a+1)%3], R=P[(a+2)%3];
+      const v1=[Q.x-A.x,Q.y-A.y], v2=[R.x-A.x,R.y-A.y];
+      const l1=Math.hypot(v1[0],v1[1]), l2=Math.hypot(v2[0],v2[1]);
+      const hyp = Math.hypot(Q.x-R.x,Q.y-R.y);
+      if(hyp < Math.max(l1,l2)) continue;
+      const cos = Math.abs((v1[0]*v2[0]+v1[1]*v2[1])/(l1*l2));
+      const ratio = l1/l2;
+      const leg = (l1+l2)/2/ms/14;
+      if(cos>0.5 || ratio<0.6 || ratio>1.67 || leg<0.6 || leg>1.5) continue;
+      const score = Math.abs(ratio-1) + cos + Math.abs(leg-1);
+      const cross = v1[0]*v2[1]-v1[1]*v2[0];
+      const TR = cross>0 ? Q : R, BL = cross>0 ? R : Q;
+      out.push({TL:A, TR, BL, score});
+    }
   }
-  function escapeHtml(s){ return (s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-
-  function attachHandlers(){
-    root.querySelectorAll('[data-punch]').forEach(el=> el.onclick = ()=> openPunchModal(el.getAttribute('data-punch')) );
-    const adminBtn = document.getElementById('aa-admin-btn');
-    if(adminBtn) adminBtn.onclick = openAdmin;
-    const cancel = document.getElementById('aa-cancel');
-    if(cancel) cancel.onclick = closeModal;
-    const gotoPunch = document.getElementById('aa-goto-punch');
-    if(gotoPunch) gotoPunch.onclick = ()=>{
-      const emp = STORE.employees.find(e=>e.id===state.selectedEmployee);
-      const type = nextTypeFor(emp.id);
-      if(type==='out' && isLastToLeave(emp.id)){ state.modal='checklist'; render(); }
-      else{ goToPinEntry(); }
-    };
-    const checklistOk = document.getElementById('aa-checklist-ok');
-    if(checklistOk) checklistOk.onclick = goToPinEntry;
-    const gotoPinchange = document.getElementById('aa-goto-pinchange');
-    if(gotoPinchange) gotoPinchange.onclick = goToPinChangeVerify;
-    const empPinInput = document.getElementById('aa-emp-pin-input');
-    if(empPinInput){ empPinInput.oninput = (e)=> state.pinAttempt = e.target.value; empPinInput.onkeydown = (e)=>{ if(e.key==='Enter') tryEmpPin(); }; }
-    const empPinSubmit = document.getElementById('aa-emp-pin-submit');
-    if(empPinSubmit) empPinSubmit.onclick = tryEmpPin;
-    const oldPinInput = document.getElementById('aa-oldpin-input');
-    if(oldPinInput){ oldPinInput.oninput = (e)=> state.oldPinAttempt = e.target.value; oldPinInput.onkeydown = (e)=>{ if(e.key==='Enter') tryOldPin(); }; }
-    const oldPinSubmit = document.getElementById('aa-oldpin-submit');
-    if(oldPinSubmit) oldPinSubmit.onclick = tryOldPin;
-    const newPin1Input = document.getElementById('aa-newpin1-input');
-    if(newPin1Input) newPin1Input.oninput = (e)=> state.newPin1 = e.target.value;
-    const newPin2Input = document.getElementById('aa-newpin2-input');
-    if(newPin2Input){ newPin2Input.oninput = (e)=> state.newPin2 = e.target.value; newPin2Input.onkeydown = (e)=>{ if(e.key==='Enter') submitNewPin(); }; }
-    const newPinSubmit = document.getElementById('aa-newpin-submit');
-    if(newPinSubmit) newPinSubmit.onclick = submitNewPin;
-    const pinInput = document.getElementById('aa-pin-input');
-    if(pinInput){ pinInput.oninput = (e)=> state.pinInput = e.target.value; pinInput.onkeydown = (e)=>{ if(e.key==='Enter') tryPin(); }; }
-    const pinSubmit = document.getElementById('aa-pin-submit');
-    if(pinSubmit) pinSubmit.onclick = tryPin;
-    root.querySelectorAll('[data-tab]').forEach(el=> el.onclick = ()=>{ state.adminTab = el.getAttribute('data-tab'); render(); } );
-    const addEmpBtn = document.getElementById('aa-add-emp');
-    if(addEmpBtn){ addEmpBtn.onclick = ()=>{ const v = document.getElementById('aa-new-emp').value; const p = document.getElementById('aa-new-emp-pin').value; addEmployee(v, p); }; }
-    root.querySelectorAll('[data-remove]').forEach(el=> el.onclick = ()=>{ if(confirm('削除しますか？')) removeEmployee(el.getAttribute('data-remove')); } );
-    root.querySelectorAll('[data-rename]').forEach(el=> el.onclick = ()=>{ const id=el.getAttribute('data-rename'); const cur = STORE.employees.find(e=>e.id===id); const name = prompt('新しい名前', cur?cur.name:''); if(name) renameEmployee(id,name); } );
-    root.querySelectorAll('[data-pinchange]').forEach(el=> el.onclick = ()=>{ const id=el.getAttribute('data-pinchange'); if(confirm('カメラが起動します。撮影後に新しいPINを設定します。よろしいですか？')) adminChangePinStart(id); } );
-    root.querySelectorAll('[data-delrecord]').forEach(el=> el.onclick = ()=>{ if(confirm('この記録を削除しますか？')) deleteRecord(el.getAttribute('data-delrecord')); } );
-    root.querySelectorAll('[data-delpinlog]').forEach(el=> el.onclick = ()=>{ if(confirm('写真のみ削除します(氏名・日時の記録は残ります)。よろしいですか？')) deletePinLog(el.getAttribute('data-delpinlog')); } );
-    const exportBtn = document.getElementById('aa-export');
-    if(exportBtn) exportBtn.onclick = exportCSV;
-    const filterMonth = document.getElementById('aa-filter-month');
-    if(filterMonth) filterMonth.onchange = (e)=>{ state.filterMonth = e.target.value; render(); };
-    const filterEmp = document.getElementById('aa-filter-emp');
-    if(filterEmp) filterEmp.onchange = (e)=>{ state.filterEmp = e.target.value; render(); };
-    const addAdminBtn = document.getElementById('aa-add-admin');
-    if(addAdminBtn){ addAdminBtn.onclick = ()=>{ const n = document.getElementById('aa-new-admin-name').value; const p = document.getElementById('aa-new-admin-pin').value; addAdmin(n,p); }; }
-    root.querySelectorAll('[data-adminremove]').forEach(el=> el.onclick = ()=>{ if(confirm('削除しますか？')) removeAdmin(el.getAttribute('data-adminremove')); } );
-    root.querySelectorAll('[data-adminpinchange]').forEach(el=> el.onclick = ()=>{ const id=el.getAttribute('data-adminpinchange'); const pin = prompt('新しいPIN(4桁以上)'); if(pin!==null) changeAdminPin(id,pin); } );
+  return out.sort((x,y)=>x.score-y.score).slice(0,4);
+}
+/* 4点の対応から射影変換(ホモグラフィ)を求める。src=[[u,v]x4] → dst=[[x,y]x4] */
+function homography(src,dst){
+  const A=[], b=[];
+  for(let i=0;i<4;i++){
+    const [u,v]=src[i], [x,y]=dst[i];
+    A.push([u,v,1,0,0,0,-u*x,-v*x]); b.push(x);
+    A.push([0,0,0,u,v,1,-u*y,-v*y]); b.push(y);
   }
-
-  loadAll();
-  setInterval(()=>{ if(!state.modal) render(); }, 15000);
-
-  if('serviceWorker' in navigator){
-    window.addEventListener('load', ()=>{
-      navigator.serviceWorker.register('service-worker.js').catch(()=>{});
-    });
+  for(let c=0;c<8;c++){
+    let p=c; for(let r=c+1;r<8;r++) if(Math.abs(A[r][c])>Math.abs(A[p][c])) p=r;
+    if(Math.abs(A[p][c])<1e-12) return null;
+    [A[c],A[p]]=[A[p],A[c]]; [b[c],b[p]]=[b[p],b[c]];
+    for(let r=0;r<8;r++){
+      if(r===c) continue;
+      const f=A[r][c]/A[c][c];
+      for(let k=c;k<8;k++) A[r][k]-=f*A[c][k];
+      b[r]-=f*b[c];
+    }
   }
+  const h=[]; for(let i=0;i<8;i++) h.push(b[i]/A[i][i]);
+  return h;
+}
+function sampleMatrix(bin,w,h,T,dx,dy){
+  // 右下の隅の位置は直接見えないので、平行四辺形を基準に少しずらした仮説(dx,dy モジュール分)で試す
+  const ux=(T.TR.x-T.TL.x)/14, uy=(T.TR.y-T.TL.y)/14;
+  const vx=(T.BL.x-T.TL.x)/14, vy=(T.BL.y-T.TL.y)/14;
+  const BR = { x:T.TR.x+T.BL.x-T.TL.x + dx*ux + dy*vx, y:T.TR.y+T.BL.y-T.TL.y + dx*uy + dy*vy };
+  const H = homography([[3.5,3.5],[17.5,3.5],[3.5,17.5],[17.5,17.5]],
+                       [[T.TL.x,T.TL.y],[T.TR.x,T.TR.y],[T.BL.x,T.BL.y],[BR.x,BR.y]]);
+  if(!H) return null;
+  const map=(u,v)=>{ const d=H[6]*u+H[7]*v+1; return [(H[0]*u+H[1]*v+H[2])/d, (H[3]*u+H[4]*v+H[5])/d]; };
+  const m = newMatrix();
+  const px = (x,y)=>{ const xx=Math.round(x), yy=Math.round(y); return (xx<0||yy<0||xx>=w||yy>=h) ? 0 : bin[yy*w+xx]; };
+  const offs = [[0,0],[0.22,0],[-0.22,0],[0,0.22],[0,-0.22]];
+  for(let r=0;r<N;r++) for(let c=0;c<N;c++){
+    let dark = 0;
+    for(const [a,b] of offs){ const p = map(c+0.5+a, r+0.5+b); dark += px(p[0],p[1]); }
+    m[r][c] = dark>=3 ? 1 : 0;
+  }
+  return m;
+}
+const HYP = (function(){
+  const list=[]; const st=0.6;
+  for(let i=-2;i<=2;i++) for(let j=-2;j<=2;j++) list.push([i*st,j*st]);
+  return list.sort((a,b)=>(a[0]*a[0]+a[1]*a[1])-(b[0]*b[0]+b[1]*b[1]));
 })();
+let lastInfo = { finders:0, ms:0 };
+function decodeBinary(bin,w,h){
+  const f = findFinders(bin,w,h);
+  lastInfo = { finders:f.length, ms: f.length ? f.slice(0,3).reduce((a,c)=>a+c.ms,0)/Math.min(3,f.length) : 0 };
+  if(f.length<3) return null;
+  for(const T of triples(f)){
+    for(const [dx,dy] of HYP){
+      const m = sampleMatrix(bin,w,h,T,dx,dy);
+      if(!m) continue;
+      const s = decodeMatrix(m) || decodeMatrix(transpose(m));
+      if(s!==null) return s;
+    }
+  }
+  return null;
+}
+/* mode: 0=全体の明暗で二値化 / 1=場所ごとの明暗で二値化 / 省略=両方試す */
+function decodeGray(g,w,h,mode){
+  if(mode===0 || mode===undefined){
+    const s = decodeBinary(binarizeGlobal(g,w,h),w,h);
+    if(s!==null || mode===0) return s;
+  }
+  return decodeBinary(binarizeAdaptive(g,w,h),w,h);
+}
+
+return { encode, toSvg, decodeGray, decodeMatrix, getInfo:()=>lastInfo, _internal:{ rsCorrect, rsRemainder, rsDivisor, ORDER, FUNC, formatBits } };
+})();
+if(typeof module!=='undefined' && module.exports) module.exports = KQR;
+
+/*QRLIB-END*/
+</script>
+<script>
+const STORAGE_STAFF = 'attendance_staff_v1';
+const STORAGE_DATA  = 'attendance_data_v1';
+
+function loadStaff(){
+  const raw = localStorage.getItem(STORAGE_STAFF);
+  if(raw) return JSON.parse(raw);
+  const def = ['担当者1','担当者2','担当者3','担当者4'];
+  localStorage.setItem(STORAGE_STAFF, JSON.stringify(def));
+  return def;
+}
+function saveStaff(list){ localStorage.setItem(STORAGE_STAFF, JSON.stringify(list)); }
+
+function loadData(){
+  const raw = localStorage.getItem(STORAGE_DATA);
+  return raw ? JSON.parse(raw) : {};
+}
+function saveData(data){ localStorage.setItem(STORAGE_DATA, JSON.stringify(data)); }
+
+let staff = loadStaff();
+let data = loadData();
+
+function todayKey(){
+  const d = new Date();
+  const p = n => String(n).padStart(2,'0');
+  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`;
+}
+function nowTime(){
+  const d = new Date();
+  const p = n => String(n).padStart(2,'0');
+  return `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+}
+function fmtDateLabel(key){
+  const [y,m,d] = key.split('-');
+  const w = '日月火水木金土'[new Date(key).getDay()];
+  return `${y}年${m}月${d}日（${w}）`;
+}
+
+function ensureDay(key){
+  if(!data[key]) data[key] = {};
+  staff.forEach(name=>{
+    if(!data[key][name]) data[key][name] = {in:null, out:null};
+  });
+}
+
+function renderToday(){
+  const key = todayKey();
+  document.getElementById('todayDate').textContent = fmtDateLabel(key);
+  document.getElementById('todayLabel').textContent = new Date().toLocaleString('ja-JP');
+  ensureDay(key);
+  const grid = document.getElementById('todayGrid');
+  grid.innerHTML = '';
+  if(staff.length === 0){
+    grid.innerHTML = '<div class="empty">「対象者の設定」から氏名を登録してください</div>';
+    return;
+  }
+  const hm = t => t ? t.slice(0,5) : '--:--';
+  staff.forEach(name=>{
+    const rec = data[key][name];
+    let cls, statusText, actionText;
+    if(rec.out){ cls='st-out-card'; statusText='退勤済み'; actionText='本日は完了'; }
+    else if(rec.in){ cls='st-in-card'; statusText='出勤中'; actionText='タップして退勤'; }
+    else { cls='st-none-card'; statusText='未出勤'; actionText='タップして出勤'; }
+
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'staff-card ' + cls;
+    btn.innerHTML = `
+      <span class="sc-name">${escapeHtml(name)}</span>
+      <span class="sc-status">${statusText}</span>
+      <span class="sc-times">出勤 ${hm(rec.in)} ／ 退勤 ${hm(rec.out)}</span>
+      <span class="sc-action">${actionText}</span>`;
+    btn.addEventListener('click', () => tapStaff(name));
+    grid.appendChild(btn);
+  });
+}
+
+let toastTimer = null;
+function showToast(text, onUndo){
+  const toast = document.getElementById('toast');
+  document.getElementById('toastText').textContent = text;
+  const undo = document.getElementById('toastUndo');
+  const newUndo = undo.cloneNode(true);
+  undo.parentNode.replaceChild(newUndo, undo);
+  newUndo.addEventListener('click', () => { hideToast(); onUndo(); });
+  toast.style.display = 'flex';
+  if(toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(hideToast, 8000);
+}
+function hideToast(){
+  document.getElementById('toast').style.display = 'none';
+  if(toastTimer){ clearTimeout(toastTimer); toastTimer = null; }
+}
+
+// 名前をタップ：未出勤→出勤、出勤中→退勤（目視確認あり）、退勤済み→何もしない
+function tapStaff(name){
+  const key = todayKey();
+  ensureDay(key);
+  const rec = data[key][name];
+  if(rec.out) return;
+  if(!rec.in){
+    handleClockIn(name);
+  } else {
+    handleClockOut(name);
+  }
+}
+
+function handleClockIn(name){
+  const key = todayKey();
+  ensureDay(key);
+  const t = nowTime();
+  data[key][name].in = t;
+  saveData(data);
+  renderToday();
+  renderLog();
+  showToast(`${name} さん　${t.slice(0,5)} に出勤を記録しました`, () => {
+    data[key][name].in = null;
+    saveData(data);
+    renderToday();
+    renderLog();
+  });
+}
+
+function handleClockOut(name){
+  showModal(
+    `${name} さんの退勤`,
+    `退勤を目視で確認しましたか？\n「確認しました」を押すと、現在時刻（${nowTime().slice(0,5)}）が退勤時刻として記録されます。`,
+    () => {
+      const key = todayKey();
+      ensureDay(key);
+      const t = nowTime();
+      data[key][name].out = t;
+      saveData(data);
+      closeModal();
+      renderToday();
+      renderLog();
+      showToast(`${name} さん　${t.slice(0,5)} に退勤を記録しました`, () => {
+        data[key][name].out = null;
+        saveData(data);
+        renderToday();
+        renderLog();
+      });
+    }
+  );
+}
+
+function showModal(title, body, onConfirm){
+  document.getElementById('modalTitle').textContent = title;
+  document.getElementById('modalBody').textContent = body;
+  const btn = document.getElementById('modalConfirmBtn');
+  const newBtn = btn.cloneNode(true);
+  btn.parentNode.replaceChild(newBtn, btn);
+  newBtn.addEventListener('click', onConfirm);
+  document.getElementById('confirmModal').style.display = 'flex';
+}
+function closeModal(){
+  document.getElementById('confirmModal').style.display = 'none';
+}
+
+function toggleSettings(){
+  const panel = document.getElementById('settingsPanel');
+  if(panel.style.display === 'none'){
+    renderStaffEdit();
+    panel.style.display = 'block';
+  } else {
+    panel.style.display = 'none';
+  }
+}
+function renderStaffEdit(){
+  const rows = document.getElementById('staffEditRows');
+  rows.innerHTML = '';
+  staff.forEach((name, i)=>{
+    const row = document.createElement('div');
+    row.className = 'staff-row';
+    row.innerHTML = `
+      <input type="text" value="${escapeAttr(name)}" data-idx="${i}">
+      <button class="btn-danger" onclick="removeStaffRow(${i})">削除</button>`;
+    rows.appendChild(row);
+  });
+}
+function addStaffRow(){
+  if(staff.length >= 5){ alert('登録できるのは最大5名までです。'); return; }
+  staff.push(`担当者${staff.length+1}`);
+  renderStaffEdit();
+}
+function removeStaffRow(i){
+  staff.splice(i,1);
+  renderStaffEdit();
+}
+function saveStaffNames(){
+  const inputs = document.querySelectorAll('#staffEditRows input');
+  const names = Array.from(inputs).map(i=>i.value.trim()).filter(v=>v.length>0);
+  if(names.length === 0){ alert('少なくとも1名は登録してください。'); return; }
+  const uniqueNames = [...new Set(names)];
+  if(uniqueNames.length !== names.length){ alert('同じ氏名が重複しています。'); return; }
+  staff = names;
+  saveStaff(staff);
+  document.getElementById('settingsPanel').style.display = 'none';
+  renderToday();
+  populatePastStaffSelect();
+  if(document.getElementById('qrSheetWrap').style.display !== 'none') renderQrSheet();
+}
+
+function populatePastStaffSelect(){
+  const sel = document.getElementById('pastStaffSelect');
+  const prevVal = sel.value;
+  sel.innerHTML = staff.map(name => `<option value="${escapeAttr(name)}">${escapeHtml(name)}</option>`).join('');
+  if(staff.includes(prevVal)) sel.value = prevVal;
+}
+
+function loadPastRecord(){
+  const dateVal = document.getElementById('pastDate').value;
+  const name = document.getElementById('pastStaffSelect').value;
+  const inInput = document.getElementById('pastInTime');
+  const outInput = document.getElementById('pastOutTime');
+  if(!dateVal || !name || !data[dateVal] || !data[dateVal][name]){
+    inInput.value = '';
+    outInput.value = '';
+    return;
+  }
+  const rec = data[dateVal][name];
+  inInput.value = rec.in ? rec.in.slice(0,5) : '';
+  outInput.value = rec.out ? rec.out.slice(0,5) : '';
+}
+
+function savePastRecord(){
+  const dateVal = document.getElementById('pastDate').value;
+  const name = document.getElementById('pastStaffSelect').value;
+  const inVal = document.getElementById('pastInTime').value;
+  const outVal = document.getElementById('pastOutTime').value;
+
+  if(!dateVal){ alert('日付を選択してください。'); return; }
+  if(!name){ alert('対象者を選択してください。'); return; }
+
+  const today = todayKey();
+  if(dateVal > today){ alert('未来の日付は選択できません。'); return; }
+
+  if(!confirm(`${dateVal} の ${name} さんの記録を保存します。よろしいですか？`)) return;
+
+  if(!data[dateVal]) data[dateVal] = {};
+  data[dateVal][name] = {
+    in: inVal ? inVal + ':00' : null,
+    out: outVal ? outVal + ':00' : null
+  };
+  saveData(data);
+
+  if(dateVal === today) renderToday();
+  populateMonthFilter();
+  renderLog();
+  alert('保存しました。');
+}
+
+function populateMonthFilter(){
+  const sel = document.getElementById('monthFilter');
+  const months = new Set(Object.keys(data).map(k=>k.slice(0,7)));
+  months.add(todayKey().slice(0,7));
+  const sorted = Array.from(months).sort().reverse();
+  sel.innerHTML = '<option value="all">すべて</option>' +
+    sorted.map(m=>`<option value="${m}">${m.slice(0,4)}年${m.slice(5,7)}月</option>`).join('');
+  sel.value = todayKey().slice(0,7);
+}
+
+const TEISHOKU_HOUR = 17; // 定時（時）
+const TEISHOKU_MIN = 0;   // 定時（分）
+
+// 退勤時刻(HH:MM:SS)から残業「分数」を返す。定時未満・未退勤の場合は 0 / null。
+function calcOvertimeMinutes(outTimeStr){
+  if(!outTimeStr) return null;
+  const [h, m] = outTimeStr.split(':').map(Number);
+  const outMinutes = h * 60 + m;
+  const teishokuMinutes = TEISHOKU_HOUR * 60 + TEISHOKU_MIN;
+  const diff = outMinutes - teishokuMinutes;
+  return diff > 0 ? diff : 0;
+}
+
+// 残業「分数」を "H:MM" 形式の文字列に変換
+function minutesToHM(totalMinutes){
+  const oh = Math.floor(totalMinutes / 60);
+  const om = totalMinutes % 60;
+  return `${oh}:${String(om).padStart(2,'0')}`;
+}
+
+// 退勤時刻(HH:MM:SS)から残業時間を "H:MM" 形式で返す。未退勤の場合は null。
+function calcOvertime(outTimeStr){
+  const mins = calcOvertimeMinutes(outTimeStr);
+  if(mins === null) return null;
+  return minutesToHM(mins);
+}
+
+function renderLog(){
+  const sel = document.getElementById('monthFilter');
+  const filterVal = sel.value || 'all';
+  const body = document.getElementById('logBody');
+  body.innerHTML = '';
+
+  // 対象者ごとに「出勤日数」「残業時間合計（分）」を集計
+  const summary = {};
+  staff.forEach(name=>{ summary[name] = {days: 0, overtimeMinutes: 0}; });
+
+  Object.keys(data).forEach(dateKey=>{
+    if(filterVal !== 'all' && !dateKey.startsWith(filterVal)) return;
+    staff.forEach(name=>{
+      const rec = data[dateKey][name];
+      if(rec && (rec.in || rec.out)){
+        if(!summary[name]) summary[name] = {days: 0, overtimeMinutes: 0};
+        summary[name].days += 1;
+        const mins = calcOvertimeMinutes(rec.out);
+        if(mins) summary[name].overtimeMinutes += mins;
+      }
+    });
+  });
+
+  const hasAny = Object.values(summary).some(s => s.days > 0);
+  if(!hasAny){
+    body.innerHTML = '<tr><td colspan="3" class="empty">該当する記録がありません</td></tr>';
+    return;
+  }
+
+  staff.forEach(name=>{
+    const s = summary[name];
+    if(!s || s.days === 0) return;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${escapeHtml(name)}</td>
+      <td>${s.days}日</td>
+      <td>${minutesToHM(s.overtimeMinutes)}</td>`;
+    body.appendChild(tr);
+  });
+}
+
+function bulkDeleteMonth(){
+  const sel = document.getElementById('monthFilter');
+  const filterVal = sel.value || 'all';
+  if(filterVal === 'all'){
+    alert('一括削除は特定の月を選択しているときのみ実行できます。「対象月」で削除したい月を選んでください。');
+    return;
+  }
+  const targetDates = Object.keys(data).filter(dateKey => dateKey.startsWith(filterVal));
+  if(targetDates.length === 0){
+    alert('選択中の月には記録がありません。');
+    return;
+  }
+  const label = filterVal.slice(0,4) + '年' + filterVal.slice(5,7) + '月';
+  if(!confirm(`${label} の記録を、全対象者分まとめて削除します。この操作は元に戻せません。よろしいですか？`)) return;
+  targetDates.forEach(dateKey=>{ delete data[dateKey]; });
+  saveData(data);
+  renderToday();
+  populateMonthFilter();
+  renderLog();
+}
+
+function deleteRecord(dateKey, name){
+  if(!confirm(`${dateKey} の ${name} さんの記録を削除します。よろしいですか？`)) return;
+  if(data[dateKey] && data[dateKey][name]){
+    data[dateKey][name] = {in:null, out:null};
+    saveData(data);
+    renderToday();
+    renderLog();
+  }
+}
+
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function escapeAttr(s){ return escapeHtml(s).replace(/'/g, '&#39;'); }
+function escapeXml(s){
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&apos;'}[c]));
+}
+
+/* ===== 本物の .xlsx (OOXML/ZIP) を外部ライブラリなしで生成する ===== */
+
+const CRC_TABLE = (() => {
+  const table = new Uint32Array(256);
+  for(let n=0;n<256;n++){
+    let c = n;
+    for(let k=0;k<8;k++){
+      c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+    }
+    table[n] = c >>> 0;
+  }
+  return table;
+})();
+function crc32(bytes){
+  let crc = 0xFFFFFFFF;
+  for(let i=0;i<bytes.length;i++){
+    crc = CRC_TABLE[(crc ^ bytes[i]) & 0xFF] ^ (crc >>> 8);
+  }
+  return (crc ^ 0xFFFFFFFF) >>> 0;
+}
+
+class ByteWriter{
+  constructor(){ this.chunks = []; this.length = 0; }
+  pushBytes(arr){ this.chunks.push(arr); this.length += arr.length; }
+  u16(v){ this.pushBytes(new Uint8Array([v & 0xFF, (v>>>8) & 0xFF])); }
+  u32(v){ this.pushBytes(new Uint8Array([v & 0xFF, (v>>>8)&0xFF, (v>>>16)&0xFF, (v>>>24)&0xFF])); }
+  toBlob(type){ return new Blob(this.chunks, {type}); }
+}
+
+function dosDateTime(d){
+  const dosTime = ((d.getHours() & 0x1F) << 11) | ((d.getMinutes() & 0x3F) << 5) | ((d.getSeconds() >> 1) & 0x1F);
+  const dosDate = (((d.getFullYear()-1980) & 0x7F) << 9) | (((d.getMonth()+1) & 0xF) << 5) | (d.getDate() & 0x1F);
+  return {dosTime, dosDate};
+}
+
+function buildXlsxBlob(files){
+  // files: [{name:'xl/workbook.xml', content:'string'}, ...]
+  const enc = new TextEncoder();
+  const now = new Date();
+  const {dosTime, dosDate} = dosDateTime(now);
+  const writer = new ByteWriter();
+  const centralEntries = [];
+
+  files.forEach(f=>{
+    const nameBytes = enc.encode(f.name);
+    const contentBytes = enc.encode(f.content);
+    const crc = crc32(contentBytes);
+    const localOffset = writer.length;
+
+    writer.u32(0x04034b50);   // local file header signature
+    writer.u16(20);           // version needed
+    writer.u16(0);            // flags
+    writer.u16(0);            // compression method (0 = store)
+    writer.u16(dosTime);
+    writer.u16(dosDate);
+    writer.u32(crc);
+    writer.u32(contentBytes.length); // compressed size
+    writer.u32(contentBytes.length); // uncompressed size
+    writer.u16(nameBytes.length);
+    writer.u16(0);            // extra field length
+    writer.pushBytes(nameBytes);
+    writer.pushBytes(contentBytes);
+
+    centralEntries.push({nameBytes, crc, size: contentBytes.length, localOffset});
+  });
+
+  const centralStart = writer.length;
+  centralEntries.forEach(e=>{
+    writer.u32(0x02014b50); // central directory signature
+    writer.u16(20);         // version made by
+    writer.u16(20);         // version needed
+    writer.u16(0);          // flags
+    writer.u16(0);          // compression method
+    writer.u16(dosTime);
+    writer.u16(dosDate);
+    writer.u32(e.crc);
+    writer.u32(e.size);
+    writer.u32(e.size);
+    writer.u16(e.nameBytes.length);
+    writer.u16(0); // extra length
+    writer.u16(0); // comment length
+    writer.u16(0); // disk number start
+    writer.u16(0); // internal attrs
+    writer.u32(0); // external attrs
+    writer.u32(e.localOffset);
+    writer.pushBytes(e.nameBytes);
+  });
+  const centralSize = writer.length - centralStart;
+
+  writer.u32(0x06054b50); // end of central directory
+  writer.u16(0); // disk number
+  writer.u16(0); // disk with central dir
+  writer.u16(centralEntries.length);
+  writer.u16(centralEntries.length);
+  writer.u32(centralSize);
+  writer.u32(centralStart);
+  writer.u16(0); // comment length
+
+  return writer.toBlob('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+}
+
+function colLetter(n){ // 1 -> A, 2 -> B ...
+  let s = '';
+  while(n > 0){
+    const m = (n - 1) % 26;
+    s = String.fromCharCode(65 + m) + s;
+    n = Math.floor((n - 1) / 26);
+  }
+  return s;
+}
+
+function exportExcel(){
+  const sel = document.getElementById('monthFilter');
+  const filterVal = sel.value || 'all';
+
+  const rows = [];
+  Object.keys(data).sort().forEach(dateKey=>{
+    if(filterVal !== 'all' && !dateKey.startsWith(filterVal)) return;
+    staff.forEach(name=>{
+      const rec = data[dateKey][name];
+      if(rec && (rec.in || rec.out)){
+        const overtime = calcOvertime(rec.out);
+        rows.push([dateKey, name, rec.in || '', rec.out || '', overtime === null ? '' : overtime]);
+      }
+    });
+  });
+
+  const headers = ['日付','氏名','出勤時刻','退勤時刻','残業時間'];
+  let sheetRows = '';
+
+  sheetRows += '<row r="1">';
+  headers.forEach((h,i)=>{
+    const cellRef = colLetter(i+1) + '1';
+    sheetRows += `<c r="${cellRef}" t="inlineStr" s="1"><is><t xml:space="preserve">${escapeXml(h)}</t></is></c>`;
+  });
+  sheetRows += '</row>';
+
+  rows.forEach((r, rowIdx)=>{
+    const rNum = rowIdx + 2;
+    sheetRows += `<row r="${rNum}">`;
+    r.forEach((v, colIdx)=>{
+      const cellRef = colLetter(colIdx+1) + rNum;
+      sheetRows += `<c r="${cellRef}" t="inlineStr"><is><t xml:space="preserve">${escapeXml(v)}</t></is></c>`;
+    });
+    sheetRows += '</row>';
+  });
+
+  const contentTypes = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+<Default Extension="xml" ContentType="application/xml"/>
+<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
+<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>
+</Types>`;
+
+  const rootRels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
+</Relationships>`;
+
+  const workbookRels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
+<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
+</Relationships>`;
+
+  const workbookXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+<sheets><sheet name="勤怠記録" sheetId="1" r:id="rId1"/></sheets>
+</workbook>`;
+
+  const stylesXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+<fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts>
+<fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills>
+<borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>
+<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
+<cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/></cellXfs>
+<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>
+</styleSheet>`;
+
+  const sheetXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+<sheetData>${sheetRows}</sheetData>
+</worksheet>`;
+
+  const files = [
+    {name:'[Content_Types].xml', content: contentTypes},
+    {name:'_rels/.rels', content: rootRels},
+    {name:'xl/workbook.xml', content: workbookXml},
+    {name:'xl/_rels/workbook.xml.rels', content: workbookRels},
+    {name:'xl/styles.xml', content: stylesXml},
+    {name:'xl/worksheets/sheet1.xml', content: sheetXml}
+  ];
+
+  const blob = buildXlsxBlob(files);
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const stamp = new Date().toISOString().slice(0,10);
+  a.href = url;
+  a.download = `勤怠記録_${filterVal === 'all' ? '全期間' : filterVal}_${stamp}.xlsx`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+
+/* ===================== 個人別QRコード ===================== */
+const QR_SALT = 'kintai-qr-v1|';
+const QR_ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
+function cyrb53(str, seed){
+  let h1 = 0xdeadbeef ^ (seed||0), h2 = 0x41c6ce57 ^ (seed||0);
+  for(let i=0;i<str.length;i++){
+    const ch = str.charCodeAt(i);
+    h1 = Math.imul(h1 ^ ch, 2654435761);
+    h2 = Math.imul(h2 ^ ch, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ (h1>>>16), 2246822507); h1 ^= Math.imul(h2 ^ (h2>>>13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2>>>16), 2246822507); h2 ^= Math.imul(h1 ^ (h1>>>13), 3266489909);
+  return 4294967296 * (2097151 & h2) + (h1>>>0);
+}
+function normName(n){ return String(n).normalize('NFKC').replace(/\s+/g,''); }
+// 氏名から10文字のコードを作る（どの端末でも同じ氏名なら同じコード）
+function codeOf(name){
+  let x = cyrb53(QR_SALT + normName(name)), s = '';
+  for(let i=0;i<10;i++){ s += QR_ALPHABET[x % 32]; x = Math.floor(x / 32); }
+  return s;
+}
+function nameByCode(code){ return staff.find(n => codeOf(n) === code) || null; }
+
+function renderQrSheet(){
+  const wrap = document.getElementById('qrSheet');
+  const mm = Number(document.getElementById('qrSize').value) || 40;
+  wrap.innerHTML = '';
+  staff.forEach(name=>{
+    const item = document.createElement('div');
+    item.className = 'qr-item';
+    item.style.width = mm + 'mm';
+    item.innerHTML = KQR.toSvg(KQR.encode(codeOf(name), 'Q'), {quiet:2})
+      + `<div class="qr-name" style="font-size:${Math.max(3, mm/11).toFixed(1)}mm">${escapeHtml(name)}</div>`;
+    wrap.appendChild(item);
+  });
+}
+function openQrSheet(){
+  document.getElementById('qrSheetWrap').style.display = 'block';
+  renderQrSheet();
+  document.getElementById('qrSheetWrap').scrollIntoView({behavior:'smooth', block:'start'});
+}
+function closeQrSheet(){ document.getElementById('qrSheetWrap').style.display = 'none'; }
+function printQrSheet(){
+  renderQrSheet();
+  document.body.classList.add('printing-qr');
+  const done = ()=>document.body.classList.remove('printing-qr');
+  window.addEventListener('afterprint', done, {once:true});
+  setTimeout(()=>{ try{ window.print(); }catch(e){ done(); alert('この端末では印刷できません。パソコンで開いて印刷してください。'); } }, 60);
+}
+
+/* ===================== QR読み取り（カメラ） ===================== */
+const SCAN_SAME_PERSON_MS = 10000;   // 同じ人の連続打刻を防ぐ時間
+const SCAN_REARM_MS = 1800;          // QRが画面から外れてから、同じQRを再び受け付けるまでの時間
+const SCAN_PREF_KEY = 'attendance_scan_pref_v1';
+let scanStream = null, scanTimer = null, scanFrameNo = 0, scanFacing = 'user';
+let scanLast = {code:null, seenAt:0};
+const scanActed = {};
+let scanWake = null, audioCtx = null, bannerTimer = null;
+const scanCanvas = document.createElement('canvas');
+let scanCtx = null;
+
+function loadScanPref(){ try{ return JSON.parse(localStorage.getItem(SCAN_PREF_KEY)||'{}'); }catch(e){ return {}; } }
+function saveScanPref(p){ try{ localStorage.setItem(SCAN_PREF_KEY, JSON.stringify(p)); }catch(e){} }
+function setScanHint(t){ const h=document.getElementById('scanHint'); if(h.textContent!==t) h.textContent=t; }
+const HINT_DEFAULT = 'QRコードを枠の中にかざしてください。';
+
+function scanBanner(text, kind){
+  const b = document.getElementById('scanBanner');
+  b.textContent = text; b.className = 'scan-banner ' + kind; b.style.display = 'block';
+  if(bannerTimer) clearTimeout(bannerTimer);
+  bannerTimer = setTimeout(()=>{ b.style.display='none'; }, 4500);
+}
+function beep(kind){
+  try{
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    if(audioCtx.state === 'suspended') audioCtx.resume();
+    const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+    o.frequency.value = kind==='ok' ? 880 : (kind==='err' ? 220 : 520);
+    g.gain.value = 0.15; o.connect(g); g.connect(audioCtx.destination);
+    o.start(); o.stop(audioCtx.currentTime + (kind==='err' ? 0.35 : 0.12));
+  }catch(e){}
+}
+async function requestWake(){
+  try{ if(navigator.wakeLock && !document.hidden) scanWake = await navigator.wakeLock.request('screen'); }catch(e){}
+}
+function releaseWake(){ try{ if(scanWake){ scanWake.release(); scanWake = null; } }catch(e){} }
+
+async function startScan(silent){
+  const btn = document.getElementById('scanToggle');
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+    setScanHint('このブラウザではカメラを使えません。下の名前ボタンをタップして打刻してください。');
+    return;
+  }
+  try{
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    if(audioCtx.state === 'suspended') audioCtx.resume();
+  }catch(e){}
+  try{
+    scanStream = await navigator.mediaDevices.getUserMedia({
+      video:{ facingMode:scanFacing, width:{ideal:1280}, height:{ideal:720} }, audio:false
+    });
+  }catch(e){
+    scanStream = null;
+    setScanHint(silent ? 'カメラはオフです。使うときは「カメラをオンにする」を押してください。'
+                       : 'カメラを使えませんでした。カメラの許可を確認してください（許可しない場合は下の名前ボタンで打刻できます）。');
+    return;
+  }
+  const v = document.getElementById('scanVideo');
+  v.srcObject = scanStream;
+  v.style.transform = scanFacing === 'user' ? 'scaleX(-1)' : 'none';
+  try{ await v.play(); }catch(e){}
+  document.getElementById('scanBody').style.display = 'block';
+  document.getElementById('scanFlip').style.display = '';
+  btn.textContent = 'カメラをオフにする'; btn.className = 'btn-ghost';
+  scanLast = {code:null, seenAt:0};
+  setScanHint(HINT_DEFAULT);
+  saveScanPref({on:true, facing:scanFacing});
+  requestWake();
+  scanLoop();
+}
+function stopScan(keepPref){
+  if(scanTimer){ clearTimeout(scanTimer); scanTimer = null; }
+  if(scanStream){ scanStream.getTracks().forEach(t=>t.stop()); scanStream = null; }
+  const v = document.getElementById('scanVideo'); v.srcObject = null;
+  document.getElementById('scanBody').style.display = 'none';
+  document.getElementById('scanFlip').style.display = 'none';
+  const btn = document.getElementById('scanToggle');
+  btn.textContent = 'カメラをオンにする'; btn.className = 'btn-in';
+  setScanHint('カメラはオフです。使うときは「カメラをオンにする」を押してください。');
+  releaseWake();
+  if(!keepPref) saveScanPref({on:false, facing:scanFacing});
+}
+function toggleScan(){ if(scanStream) stopScan(); else startScan(); }
+async function flipCamera(){
+  scanFacing = scanFacing === 'user' ? 'environment' : 'user';
+  stopScan(true);
+  await startScan();
+}
+function scanLoop(){
+  if(!scanStream) return;
+  scanTimer = setTimeout(()=>{ try{ scanStep(); }catch(e){} scanLoop(); }, 90);
+}
+function scanStep(){
+  const v = document.getElementById('scanVideo');
+  if(document.hidden || v.readyState < 2 || !v.videoWidth) return;
+  const sc = Math.min(1, 800 / v.videoWidth);
+  const w = Math.round(v.videoWidth * sc), h = Math.round(v.videoHeight * sc);
+  if(scanCanvas.width !== w || scanCanvas.height !== h){ scanCanvas.width = w; scanCanvas.height = h; scanCtx = null; }
+  if(!scanCtx) scanCtx = scanCanvas.getContext('2d', {willReadFrequently:true});
+  scanCtx.drawImage(v, 0, 0, w, h);
+  const px = scanCtx.getImageData(0, 0, w, h).data;
+  const gray = new Uint8Array(w*h);
+  for(let i=0,j=0;i<gray.length;i++,j+=4) gray[i] = (px[j]*77 + px[j+1]*151 + px[j+2]*28) >> 8;
+  const code = KQR.decodeGray(gray, w, h, scanFrameNo++ % 2);
+  onScanResult(code);
+}
+function modalIsOpen(){ return document.getElementById('confirmModal').style.display === 'flex'; }
+
+function onScanResult(code){
+  const now = Date.now();
+  if(code === null){
+    if(scanLast.code && now - scanLast.seenAt > SCAN_REARM_MS) scanLast.code = null;
+    const info = KQR.getInfo();
+    if(info.finders >= 3) setScanHint(info.ms < 3.8 ? 'もう少しカメラに近づけてください。' : 'QRコードを動かさず、少しお待ちください。');
+    else if(info.finders > 0) setScanHint('QRコード全体が枠の中に入るようにしてください。');
+    else setScanHint(HINT_DEFAULT);
+    return;
+  }
+  scanLast.seenAt = now;
+  if(scanLast.code === code) return;      // かざし続けている間は1回だけ処理
+  scanLast.code = code;
+  setScanHint(HINT_DEFAULT);
+
+  const name = nameByCode(code);
+  if(!name){ scanBanner('登録されていないQRコードです', 'err'); beep('err'); return; }
+  if(scanActed[name] && now - scanActed[name] < SCAN_SAME_PERSON_MS){
+    scanBanner(`${name} さん：さきほど記録しました`, 'warn'); beep('warn'); return;
+  }
+  const key = todayKey(); ensureDay(key);
+  const rec = data[key][name];
+  if(rec.out){ scanBanner(`${name} さん：本日はすでに退勤済みです`, 'warn'); beep('warn'); return; }
+  if(!rec.in){
+    scanActed[name] = now;
+    handleClockIn(name);
+    scanBanner(`${name} さん　${nowTime().slice(0,5)} 出勤`, 'ok'); beep('ok');
+  } else {
+    if(modalIsOpen()){ scanBanner('退勤の確認待ちです。先に確認ボタンを押してください', 'warn'); beep('warn'); return; }
+    scanActed[name] = now;
+    scanBanner(`${name} さん：退勤の確認をしてください`, 'warn'); beep('warn');
+    handleClockOut(name);
+  }
+}
+document.addEventListener('visibilitychange', ()=>{ if(!document.hidden && scanStream) requestWake(); });
+window.addEventListener('pagehide', ()=>{ stopScan(true); });
+
+// 初期化
+renderToday();
+populateMonthFilter();
+renderLog();
+populatePastStaffSelect();
+document.getElementById('pastDate').max = todayKey();
+document.getElementById('pastDate').value = todayKey();
+loadPastRecord();
+{ const p = loadScanPref(); if(p.facing) scanFacing = p.facing; if(p.on) startScan(true); }
+setInterval(()=>{ document.getElementById('todayLabel').textContent = new Date().toLocaleString('ja-JP'); }, 1000);
+</script>
+<script>
+/* オフライン保存(Service Worker)。file:// では何もしない */
+try{ if('serviceWorker' in navigator && location.protocol.indexOf('http')===0){
+  window.addEventListener('load',function(){ navigator.serviceWorker.register('service-worker.js').catch(function(){}); });
+}}catch(e){}
 </script>
 </body>
 </html>

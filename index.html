@@ -233,7 +233,7 @@
   </div>
 
   <h2>本日の状況（<span id="todayDate"></span>）</h2>
-  <div class="note" style="margin:0 0 12px 0;">QRコードが使えないときは、自分の名前をタップしても打刻できます。1回目で「出勤」、2回目で「退勤」が記録されます（退勤は管理者の目視確認後に確定）。</div>
+  <div class="note" style="margin:0 0 12px 0;">QRコードが使えないときは、自分の名前をタップしても打刻できます。1回目で「出勤」、2回目で「退勤」が記録されます。</div>
   <div id="todayGrid" class="staff-grid"></div>
 </div>
 
@@ -263,8 +263,14 @@
   <button class="btn-ghost" id="toastUndo">取り消す</button>
 </div>
 
-<div class="card">
-  <h2>過去の記録を入力・修正</h2>
+<div class="card" id="pastCard">
+  <div class="toolbar" style="margin-bottom:0;">
+    <h2 style="margin:0;">過去の記録を入力・修正</h2>
+    <div class="spacer"></div>
+    <button class="btn-ghost" id="pastPinChange" style="display:none;" onclick="changePin()">PINを変更</button>
+    <button class="btn-in" id="pastToggleBtn" onclick="togglePast()">表示する（PIN入力）</button>
+  </div>
+  <div id="pastBody" style="display:none;margin-top:12px;">
   <div class="toolbar">
     <label style="font-size:13px;color:var(--muted);">日付：</label>
     <input type="date" id="pastDate" onchange="loadPastRecord()">
@@ -281,6 +287,7 @@
   <div class="note">
     管理者が不在だった日など、過去の出勤・退勤時刻をあとから入力・修正できます。日付と対象者を選ぶと、すでに記録があればその内容が自動的に表示されます（空欄のまま保存すると、その項目は未記録扱いになります）。
   </div>
+  </div>
 </div>
 
 <div class="card">
@@ -288,14 +295,17 @@
   <div class="toolbar">
     <label style="font-size:13px;color:var(--muted);">対象月：</label>
     <select id="monthFilter" onchange="renderLog()"></select>
+    <button class="btn-ghost" id="sumToggleBtn" onclick="toggleSummary()">集計を非表示にする</button>
     <div class="spacer"></div>
     <button class="btn-danger" id="bulkDeleteBtn" onclick="bulkDeleteMonth()">この月の記録をまとめて削除</button>
     <button class="btn-export" onclick="exportExcel()">Excel形式で出力（.xlsx）</button>
   </div>
+  <div id="sumWrap">
   <table>
     <thead><tr><th>氏名</th><th>出勤日数</th><th>残業時間合計</th></tr></thead>
     <tbody id="logBody"></tbody>
   </table>
+  </div>
   <div class="note">
     Excel出力には、この画面には表示されない<strong>日ごとの明細（出勤・退勤時刻、日ごとの残業時間）</strong>がすべて含まれます。<br>
     出力した .xlsx ファイルは正式なExcel形式のため、警告なくダブルクリックでそのままMicrosoft 365のExcelが開きます。<br>
@@ -310,6 +320,20 @@
     <div class="actions">
       <button class="btn-ghost" onclick="closeModal()">キャンセル</button>
       <button class="btn-out" id="modalConfirmBtn">確認しました</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="pinModal">
+  <div class="modal">
+    <h3 id="pinTitle">PINコード</h3>
+    <p id="pinMsg"></p>
+    <input type="password" inputmode="numeric" autocomplete="off" maxlength="8" id="pinInput1" placeholder="PINコード" style="width:100%;padding:12px;font-size:18px;margin-bottom:8px;box-sizing:border-box;">
+    <input type="password" inputmode="numeric" autocomplete="off" maxlength="8" id="pinInput2" placeholder="確認のためもう一度" style="width:100%;padding:12px;font-size:18px;margin-bottom:8px;box-sizing:border-box;display:none;">
+    <div id="pinErr" style="color:#c0392b;font-size:13px;min-height:18px;"></div>
+    <div class="actions">
+      <button class="btn-ghost" onclick="closePin()">キャンセル</button>
+      <button class="btn-in" id="pinOk" onclick="submitPin()">OK</button>
     </div>
   </div>
 </div>
@@ -916,7 +940,7 @@ function hideToast(){
   if(toastTimer){ clearTimeout(toastTimer); toastTimer = null; }
 }
 
-// 名前をタップ：未出勤→出勤、出勤中→退勤（目視確認あり）、退勤済み→何もしない
+// 名前をタップ：未出勤→出勤、出勤中→退勤（最終退勤者のみ施錠確認あり）、退勤済み→何もしない
 function tapStaff(name){
   const key = todayKey();
   ensureDay(key);
@@ -945,35 +969,111 @@ function handleClockIn(name){
   });
 }
 
-function handleClockOut(name){
-  showModal(
-    `${name} さんの退勤`,
-    `退勤を目視で確認しましたか？\n「確認しました」を押すと、現在時刻（${nowTime().slice(0,5)}）が退勤時刻として記録されます。`,
-    () => {
-      const key = todayKey();
-      ensureDay(key);
-      const t = nowTime();
-      data[key][name].out = t;
-      saveData(data);
-      closeModal();
-      renderToday();
-      renderLog();
-      showToast(`${name} さん　${t.slice(0,5)} に退勤を記録しました`, () => {
-        data[key][name].out = null;
-        saveData(data);
-        renderToday();
-        renderLog();
-      });
-    }
-  );
+// 自分以外に「出勤済みで未退勤」の人がいなければ、最終退勤者
+function isLastToLeave(name){
+  const day = data[todayKey()] || {};
+  return !staff.some(n => n !== name && day[n] && day[n].in && !day[n].out);
 }
 
-function showModal(title, body, onConfirm){
+function doClockOut(name){
+  const key = todayKey();
+  ensureDay(key);
+  const t = nowTime();
+  data[key][name].out = t;
+  saveData(data);
+  renderToday();
+  renderLog();
+  showToast(`${name} さん　${t.slice(0,5)} に退勤を記録しました`, () => {
+    data[key][name].out = null;
+    saveData(data);
+    renderToday();
+    renderLog();
+  });
+}
+
+function handleClockOut(name){
+  if(isLastToLeave(name)){
+    showModal(
+      '施錠の確認',
+      `施錠は完了しましたか？\n（会議室の窓、事務室の窓、役員室、管理区域、書庫）\n\n「完了した」を押した時点で、${name} さんの退勤が記録されます。`,
+      () => { closeModal(); doClockOut(name); },
+      '完了した'
+    );
+  } else {
+    doClockOut(name);
+  }
+}
+
+/* ---------- PINコード（過去記録画面の表示用） ---------- */
+const PIN_KEY = 'attendance_pin_v1';
+const SUMVIS_KEY = 'attendance_sumvis_v1';
+function pinHash(p){ return String(cyrb53('kintai-pin|' + p)); }
+function getPinHash(){ try{ return localStorage.getItem(PIN_KEY); }catch(e){ return null; } }
+let pinMode = null, pinCb = null;
+
+function openPin(mode, cb){
+  pinMode = mode; pinCb = cb;
+  const t = document.getElementById('pinTitle'), m = document.getElementById('pinMsg');
+  const i1 = document.getElementById('pinInput1'), i2 = document.getElementById('pinInput2');
+  i1.value = ''; i2.value = ''; document.getElementById('pinErr').textContent = '';
+  if(mode === 'verify'){
+    t.textContent = 'PINコードの入力'; m.textContent = 'PINコードを入力してください。';
+    i1.placeholder = 'PINコード'; i2.style.display = 'none';
+  } else {
+    t.textContent = (mode === 'setup') ? 'PINコードの新規設定' : 'PINコードの変更';
+    m.textContent = '4〜8桁の数字を決めて、2回入力してください。忘れないよう控えておいてください。';
+    i1.placeholder = '新しいPINコード'; i2.style.display = 'block';
+  }
+  document.getElementById('pinModal').style.display = 'flex';
+  setTimeout(()=>{ try{ i1.focus(); }catch(e){} }, 50);
+}
+function closePin(){ document.getElementById('pinModal').style.display = 'none'; pinCb = null; }
+function submitPin(){
+  const v1 = document.getElementById('pinInput1').value.trim();
+  const v2 = document.getElementById('pinInput2').value.trim();
+  const err = document.getElementById('pinErr');
+  if(pinMode === 'verify'){
+    if(pinHash(v1) !== getPinHash()){ err.textContent = 'PINコードが違います。'; document.getElementById('pinInput1').value=''; return; }
+  } else {
+    if(!/^[0-9]{4,8}$/.test(v1)){ err.textContent = '4〜8桁の数字で入力してください。'; return; }
+    if(v1 !== v2){ err.textContent = '2回の入力が一致しません。'; return; }
+    try{ localStorage.setItem(PIN_KEY, pinHash(v1)); }catch(e){ err.textContent = 'PINを保存できませんでした。'; return; }
+  }
+  const cb = pinCb; closePin(); if(cb) cb();
+}
+document.addEventListener('keydown', e => {
+  if(e.key === 'Enter' && document.getElementById('pinModal').style.display === 'flex'){ e.preventDefault(); submitPin(); }
+});
+
+function setPastVisible(v){
+  document.getElementById('pastBody').style.display = v ? 'block' : 'none';
+  document.getElementById('pastPinChange').style.display = v ? '' : 'none';
+  const b = document.getElementById('pastToggleBtn');
+  b.textContent = v ? '非表示にする' : '表示する（PIN入力）';
+  b.className = v ? 'btn-ghost' : 'btn-in';
+}
+function togglePast(){
+  if(document.getElementById('pastBody').style.display !== 'none'){ setPastVisible(false); return; }
+  if(!getPinHash()) openPin('setup', () => setPastVisible(true));
+  else openPin('verify', () => setPastVisible(true));
+}
+function changePin(){ openPin('change', () => { alert('PINコードを変更しました。'); }); }
+
+/* ---------- 月間集計の表示・非表示 ---------- */
+function setSummaryVisible(v, save){
+  document.getElementById('sumWrap').style.display = v ? '' : 'none';
+  document.getElementById('sumToggleBtn').textContent = v ? '集計を非表示にする' : '集計を表示する';
+  if(save){ try{ localStorage.setItem(SUMVIS_KEY, v ? '1' : '0'); }catch(e){} }
+}
+function toggleSummary(){ setSummaryVisible(document.getElementById('sumWrap').style.display === 'none', true); }
+
+function showModal(title, body, onConfirm, confirmLabel){
   document.getElementById('modalTitle').textContent = title;
   document.getElementById('modalBody').textContent = body;
   const btn = document.getElementById('modalConfirmBtn');
   const newBtn = btn.cloneNode(true);
   btn.parentNode.replaceChild(newBtn, btn);
+  newBtn.textContent = confirmLabel || '確認しました';
   newBtn.addEventListener('click', onConfirm);
   document.getElementById('confirmModal').style.display = 'flex';
 }
@@ -1588,7 +1688,11 @@ function onScanResult(code){
   } else {
     if(modalIsOpen()){ scanBanner('退勤の確認待ちです。先に確認ボタンを押してください', 'warn'); beep('warn'); return; }
     scanActed[name] = now;
-    scanBanner(`${name} さん：退勤の確認をしてください`, 'warn'); beep('warn');
+    if(isLastToLeave(name)){
+      scanBanner(`${name} さん：施錠の確認をしてください`, 'warn'); beep('warn');
+    } else {
+      scanBanner(`${name} さん　${nowTime().slice(0,5)} 退勤`, 'ok'); beep('ok');
+    }
     handleClockOut(name);
   }
 }
@@ -1603,6 +1707,7 @@ populatePastStaffSelect();
 document.getElementById('pastDate').max = todayKey();
 document.getElementById('pastDate').value = todayKey();
 loadPastRecord();
+{ let v = '1'; try{ v = localStorage.getItem(SUMVIS_KEY) || '1'; }catch(e){} setSummaryVisible(v !== '0', false); }
 { const p = loadScanPref(); if(p.facing) scanFacing = p.facing; if(p.on) startScan(true); }
 setInterval(()=>{ document.getElementById('todayLabel').textContent = new Date().toLocaleString('ja-JP'); }, 1000);
 </script>

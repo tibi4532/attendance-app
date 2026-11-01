@@ -261,11 +261,11 @@
       <option value="45">45mm</option><option value="50">50mm</option>
     </select>
     <div class="spacer"></div>
-    <button class="btn-export" onclick="printQrSheet()">印刷する</button>
+    <button class="btn-export" onclick="exportQrExcel()">Excelで出力（QR画像）</button>
     <button class="btn-ghost" onclick="closeQrSheet()">閉じる</button>
   </div>
   <div class="note no-print" style="margin:0 0 12px 0;">
-    ご自身のカードなどに貼れるよう、点線に沿って切り取って使います。<br>
+    「Excelで出力」を押すと、QRコードを画像にしたExcelファイルができます。Excelから印刷して、枠線に沿って切り取り、カードなどに貼ってください（印刷は「拡大縮小なし(100%)」で、Excelの設定どおりに）。<br>
     ・カメラに近づけられない場合や読み取りにくい場合は、大きいサイズで印刷してください（40mm以上がおすすめ）。<br>
     ・QRコードは氏名から自動で作られるので、パソコンとタブレットのどちらで印刷しても同じコードになります（両方に同じ氏名を登録してください）。<br>
     ・QRコードは写真に撮られるとコピーされます。他人に見せたり、貸したりしないでください。
@@ -331,7 +331,7 @@
   </div>
 </div>
 
-<div id="verLabel" style="text-align:center;color:#8a8a8a;font-size:12px;margin:8px 0 24px;">アプリのバージョン：v7（2026-11-01）／本日の状況を上部に常時表示</div>
+<div id="verLabel" style="text-align:center;color:#8a8a8a;font-size:12px;margin:8px 0 24px;">アプリのバージョン：v8（2026-11-01）／QRコードはExcel画像で出力</div>
 
 <div class="modal-bg" id="confirmModal">
   <div class="modal">
@@ -1371,7 +1371,7 @@ function buildXlsxBlob(files){
 
   files.forEach(f=>{
     const nameBytes = enc.encode(f.name);
-    const contentBytes = enc.encode(f.content);
+    const contentBytes = f.bytes || enc.encode(f.content);
     const crc = crc32(contentBytes);
     const localOffset = writer.length;
 
@@ -1577,6 +1577,74 @@ function openQrSheet(){
   document.getElementById('qrSheetWrap').scrollIntoView({behavior:'smooth', block:'start'});
 }
 function closeQrSheet(){ document.getElementById('qrSheetWrap').style.display = 'none'; }
+
+/* ---- QRコードを画像(PNG)にして、Excelに貼り付けて出力 ---- */
+function qrPngBytes(name){
+  const m = KQR.encode(codeOf(name), 'Q');
+  const N = m.length, quiet = 3, px = 16, size = (N + quiet*2) * px;
+  const cv = document.createElement('canvas');
+  cv.width = size; cv.height = size;
+  const g = cv.getContext('2d');
+  g.fillStyle = '#fff'; g.fillRect(0, 0, size, size);
+  g.fillStyle = '#000';
+  for(let y=0;y<N;y++) for(let x=0;x<N;x++) if(m[y][x]) g.fillRect((x+quiet)*px, (y+quiet)*px, px, px);
+  const b64 = cv.toDataURL('image/png').split(',')[1];
+  const bin = atob(b64), out = new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+
+function exportQrExcel(){
+  if(staff.length === 0){ alert('先に氏名を登録してください。'); return; }
+  const mm = Number(document.getElementById('qrSize').value) || 40;
+  const colMm = mm + 4;
+  const perRow = Math.max(1, Math.floor(190 / colMm));
+  const colWidth = (((colMm / 25.4) * 96) - 5) / 7;
+  const imgRowPt = (mm * 72 / 25.4 + 4).toFixed(1);
+  const EMU = 36000; // 1mm
+  const pics = staff.map(name => qrPngBytes(name));
+
+  let rows = '', anchors = '';
+  const blocks = Math.ceil(staff.length / perRow);
+  for(let b=0;b<blocks;b++){
+    const r0 = 1 + b*3;
+    let nameCells = '', imgCells = '';
+    for(let c=0;c<perRow;c++){
+      const idx = b*perRow + c;
+      if(idx >= staff.length) break;
+      const col = colLetter(c+1);
+      nameCells += `<c r="${col}${r0}" t="inlineStr" s="1"><is><t xml:space="preserve">${escapeXml(staff[idx])}</t></is></c>`;
+      imgCells += `<c r="${col}${r0+1}" s="2"/>`;
+      anchors += `<xdr:oneCellAnchor><xdr:from><xdr:col>${c}</xdr:col><xdr:colOff>${2*EMU}</xdr:colOff><xdr:row>${r0}</xdr:row><xdr:rowOff>${EMU}</xdr:rowOff></xdr:from><xdr:ext cx="${mm*EMU}" cy="${mm*EMU}"/><xdr:pic><xdr:nvPicPr><xdr:cNvPr id="${idx+2}" name="QR ${idx+1}" descr="${escapeXml(staff[idx])}"/><xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr></xdr:nvPicPr><xdr:blipFill><a:blip r:embed="rId${idx+1}"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill><xdr:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${mm*EMU}" cy="${mm*EMU}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:oneCellAnchor>`;
+    }
+    rows += `<row r="${r0}" ht="24" customHeight="1">${nameCells}</row>`;
+    rows += `<row r="${r0+1}" ht="${imgRowPt}" customHeight="1">${imgCells}</row>`;
+    rows += `<row r="${r0+2}" ht="12" customHeight="1"/>`;
+  }
+
+  const X = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n';
+  const files = [
+    {name:'[Content_Types].xml', content: X + `<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Default Extension="png" ContentType="image/png"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/><Override PartName="/xl/drawings/drawing1.xml" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/></Types>`},
+    {name:'_rels/.rels', content: X + `<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`},
+    {name:'xl/workbook.xml', content: X + `<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="QRコード" sheetId="1" r:id="rId1"/></sheets></workbook>`},
+    {name:'xl/_rels/workbook.xml.rels', content: X + `<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`},
+    {name:'xl/styles.xml', content: X + `<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="14"/><name val="Calibri"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="3"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="dashed"><color rgb="FF808080"/></left><right style="dashed"><color rgb="FF808080"/></right><top style="dashed"><color rgb="FF808080"/></top><bottom/><diagonal/></border><border><left style="dashed"><color rgb="FF808080"/></left><right style="dashed"><color rgb="FF808080"/></right><top/><bottom style="dashed"><color rgb="FF808080"/></bottom><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="3"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="2" xfId="0" applyBorder="1"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`},
+    {name:'xl/worksheets/sheet1.xml', content: X + `<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetViews><sheetView workbookViewId="0" showGridLines="0"/></sheetViews><sheetFormatPr defaultRowHeight="15"/><cols><col min="1" max="${perRow}" width="${colWidth.toFixed(2)}" customWidth="1"/></cols><sheetData>${rows}</sheetData><pageMargins left="0.4" right="0.4" top="0.5" bottom="0.5" header="0.3" footer="0.3"/><pageSetup paperSize="9" orientation="portrait"/><drawing r:id="rId1"/></worksheet>`},
+    {name:'xl/worksheets/_rels/sheet1.xml.rels', content: X + `<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing" Target="../drawings/drawing1.xml"/></Relationships>`},
+    {name:'xl/drawings/drawing1.xml', content: X + `<xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">${anchors}</xdr:wsDr>`},
+    {name:'xl/drawings/_rels/drawing1.xml.rels', content: X + `<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${pics.map((_,i)=>`<Relationship Id="rId${i+1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/image${i+1}.png"/>`).join('')}</Relationships>`}
+  ];
+  pics.forEach((bytes,i)=> files.push({name:`xl/media/image${i+1}.png`, bytes}));
+
+  const blob = buildXlsxBlob(files);
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `QRコード_${mm}mm_${new Date().toISOString().slice(0,10)}.xlsx`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 function printQrSheet(){
   renderQrSheet();
   document.body.classList.add('printing-qr');

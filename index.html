@@ -232,9 +232,15 @@
     <div id="scanHint" class="scan-hint">「カメラをオンにする」を押し、各自のQRコードをカメラにかざしてください（1回目で出勤、2回目で退勤）。</div>
   </div>
 
-  <h2>本日の状況（<span id="todayDate"></span>）</h2>
-  <div class="note" style="margin:0 0 12px 0;">QRコードが使えないときは、自分の名前をタップしても打刻できます。1回目で「出勤」、2回目で「退勤」が記録されます。</div>
+  <div class="toolbar" style="margin-bottom:0;">
+    <h2 style="margin:0;">本日の状況（<span id="todayDate"></span>）</h2>
+    <div class="spacer"></div>
+    <button class="btn-ghost" id="tapToggleBtn" onclick="toggleTap()">タップで打刻を表示（非常時用）</button>
+  </div>
+  <div id="tapWrap" style="display:none;margin-top:12px;">
+  <div class="note" style="margin:0 0 12px 0;">【非常時用】QRコードが使えないときだけ、自分の名前をタップして打刻します。1回目で「出勤」、2回目で「退勤」が記録されます。</div>
   <div id="todayGrid" class="staff-grid"></div>
+  </div>
 </div>
 
 <div class="card" id="qrSheetWrap" style="display:none;">
@@ -316,7 +322,7 @@
   </div>
 </div>
 
-<div id="verLabel" style="text-align:center;color:#8a8a8a;font-size:12px;margin:8px 0 24px;">アプリのバージョン：v5（2026-11-01）／集計・過去記録はPIN式</div>
+<div id="verLabel" style="text-align:center;color:#8a8a8a;font-size:12px;margin:8px 0 24px;">アプリのバージョン：v6（2026-11-01）／タップ打刻は非常時のみ表示</div>
 
 <div class="modal-bg" id="confirmModal">
   <div class="modal">
@@ -896,6 +902,13 @@ function ensureDay(key){
   });
 }
 
+function setTapVisible(v){
+  document.getElementById('tapWrap').style.display = v ? 'block' : 'none';
+  const b = document.getElementById('tapToggleBtn');
+  b.textContent = v ? 'タップ打刻を閉じる' : 'タップで打刻を表示（非常時用）';
+}
+function toggleTap(){ setTapVisible(document.getElementById('tapWrap').style.display === 'none'); }
+
 function renderToday(){
   const key = todayKey();
   document.getElementById('todayDate').textContent = fmtDateLabel(key);
@@ -907,7 +920,6 @@ function renderToday(){
     grid.innerHTML = '<div class="empty">「対象者の設定」から氏名を登録してください</div>';
     return;
   }
-  const hm = t => t ? t.slice(0,5) : '--:--';
   staff.forEach(name=>{
     const rec = data[key][name];
     let cls, statusText, actionText;
@@ -921,7 +933,6 @@ function renderToday(){
     btn.innerHTML = `
       <span class="sc-name">${escapeHtml(name)}</span>
       <span class="sc-status">${statusText}</span>
-      <span class="sc-times">出勤 ${hm(rec.in)} ／ 退勤 ${hm(rec.out)}</span>
       <span class="sc-action">${actionText}</span>`;
     btn.addEventListener('click', () => tapStaff(name));
     grid.appendChild(btn);

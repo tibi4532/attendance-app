@@ -2,7 +2,7 @@
 // 通信できるときは常に最新の index.html を取りにいき、取れたら端末に保存する。
 // 通信できない(Wi-Fiなし)ときは、端末に保存した版を使う。
 // 更新時は VERSION を変える(古い保存分が消える)。
-const VERSION = 'attendance-v6';
+const VERSION = 'attendance-v7';
 const FILES = ['./', './index.html'];
 
 self.addEventListener('install', e => {

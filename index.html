@@ -146,7 +146,13 @@
   .staff-card:active{transform:scale(0.98);}
   .staff-card .sc-name{font-size:22px;font-weight:700;color:var(--navy-dark);}
   .staff-card .sc-status{font-size:14px;font-weight:700;}
-  .staff-card .sc-times{font-size:13px;color:var(--muted);}
+  .status-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-bottom:16px;}
+  .status-card{display:flex;flex-direction:column;gap:4px;padding:10px 14px;border:2px solid #c9d3de;border-radius:12px;background:#fff;}
+  .status-card .sc-name{font-size:18px;font-weight:700;color:var(--navy-dark);}
+  .status-card .sc-status{font-size:14px;font-weight:700;color:var(--muted);}
+  .status-card.st-in-card{border-color:#2757a8;background:#f2f7ff;}
+  .status-card.st-in-card .sc-status{color:#2757a8;}
+  .status-card.st-out-card{border-color:#cfe5d9;background:#f3f9f5;}
   .staff-card .sc-action{
     align-self:stretch;text-align:center;border-radius:8px;
     padding:8px 0;font-size:16px;font-weight:700;color:#fff;
@@ -216,6 +222,9 @@
     <div class="note">氏名を変更しても過去の記録は氏名の文字列と紐づいたまま残ります。ただし、個人用QRコードは氏名から作られるため、氏名を変えたらQRコードも作り直して貼り替えてください。</div>
   </div>
 
+  <h2 style="margin:0 0 10px 0;">本日の状況（<span id="todayDate"></span>）</h2>
+  <div id="statusGrid" class="status-grid"></div>
+
   <div class="scan-box">
     <div class="scan-head">
       <span class="scan-title">QRコードで打刻</span>
@@ -233,7 +242,7 @@
   </div>
 
   <div class="toolbar" style="margin-bottom:0;">
-    <h2 style="margin:0;">本日の状況（<span id="todayDate"></span>）</h2>
+    <h2 style="margin:0;">タップで打刻（非常時用）</h2>
     <div class="spacer"></div>
     <button class="btn-ghost" id="tapToggleBtn" onclick="toggleTap()">タップで打刻を表示（非常時用）</button>
   </div>
@@ -322,7 +331,7 @@
   </div>
 </div>
 
-<div id="verLabel" style="text-align:center;color:#8a8a8a;font-size:12px;margin:8px 0 24px;">アプリのバージョン：v6（2026-11-01）／タップ打刻は非常時のみ表示</div>
+<div id="verLabel" style="text-align:center;color:#8a8a8a;font-size:12px;margin:8px 0 24px;">アプリのバージョン：v7（2026-11-01）／本日の状況を上部に常時表示</div>
 
 <div class="modal-bg" id="confirmModal">
   <div class="modal">
@@ -915,9 +924,11 @@ function renderToday(){
   document.getElementById('todayLabel').textContent = new Date().toLocaleString('ja-JP');
   ensureDay(key);
   const grid = document.getElementById('todayGrid');
-  grid.innerHTML = '';
+  const sgrid = document.getElementById('statusGrid');
+  grid.innerHTML = ''; sgrid.innerHTML = '';
   if(staff.length === 0){
     grid.innerHTML = '<div class="empty">「対象者の設定」から氏名を登録してください</div>';
+    sgrid.innerHTML = '<div class="empty">「対象者の設定」から氏名を登録してください</div>';
     return;
   }
   staff.forEach(name=>{
@@ -926,6 +937,11 @@ function renderToday(){
     if(rec.out){ cls='st-out-card'; statusText='退勤済み'; actionText='本日は完了'; }
     else if(rec.in){ cls='st-in-card'; statusText='出勤中'; actionText='タップして退勤'; }
     else { cls='st-none-card'; statusText='未出勤'; actionText='タップして出勤'; }
+
+    const sc = document.createElement('div');
+    sc.className = 'status-card ' + cls;
+    sc.innerHTML = `<span class="sc-name">${escapeHtml(name)}</span><span class="sc-status">${statusText}</span>`;
+    sgrid.appendChild(sc);
 
     const btn = document.createElement('button');
     btn.type = 'button';

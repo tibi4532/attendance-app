@@ -291,25 +291,28 @@
 </div>
 
 <div class="card">
-  <h2>月間残業時間集計</h2>
+  <div class="toolbar" style="margin-bottom:0;">
+    <h2 style="margin:0;">月間残業時間集計</h2>
+    <div class="spacer"></div>
+    <button class="btn-in" id="sumToggleBtn" onclick="toggleSummary()">表示する（PIN入力）</button>
+  </div>
+  <div id="sumWrap" style="display:none;margin-top:12px;">
   <div class="toolbar">
     <label style="font-size:13px;color:var(--muted);">対象月：</label>
     <select id="monthFilter" onchange="renderLog()"></select>
-    <button class="btn-ghost" id="sumToggleBtn" onclick="toggleSummary()">集計を非表示にする</button>
     <div class="spacer"></div>
     <button class="btn-danger" id="bulkDeleteBtn" onclick="bulkDeleteMonth()">この月の記録をまとめて削除</button>
     <button class="btn-export" onclick="exportExcel()">Excel形式で出力（.xlsx）</button>
   </div>
-  <div id="sumWrap">
   <table>
     <thead><tr><th>氏名</th><th>出勤日数</th><th>残業時間合計</th></tr></thead>
     <tbody id="logBody"></tbody>
   </table>
-  </div>
   <div class="note">
     Excel出力には、この画面には表示されない<strong>日ごとの明細（出勤・退勤時刻、日ごとの残業時間）</strong>がすべて含まれます。<br>
     出力した .xlsx ファイルは正式なExcel形式のため、警告なくダブルクリックでそのままMicrosoft 365のExcelが開きます。<br>
     このファイルはブラウザのローカル保存機能を使用しており、同じPC・同じブラウザで開いた場合のみ記録が保持されます。定期的に「Excel形式で出力」してバックアップを取ることをおすすめします。
+  </div>
   </div>
 </div>
 
@@ -1004,9 +1007,8 @@ function handleClockOut(name){
   }
 }
 
-/* ---------- PINコード（過去記録画面の表示用） ---------- */
+/* ---------- PINコード（過去記録・月間集計の表示用） ---------- */
 const PIN_KEY = 'attendance_pin_v1';
-const SUMVIS_KEY = 'attendance_sumvis_v1';
 function pinHash(p){ return String(cyrb53('kintai-pin|' + p)); }
 function getPinHash(){ try{ return localStorage.getItem(PIN_KEY); }catch(e){ return null; } }
 let pinMode = null, pinCb = null;
@@ -1059,13 +1061,17 @@ function togglePast(){
 }
 function changePin(){ openPin('change', () => { alert('PINコードを変更しました。'); }); }
 
-/* ---------- 月間集計の表示・非表示 ---------- */
-function setSummaryVisible(v, save){
-  document.getElementById('sumWrap').style.display = v ? '' : 'none';
-  document.getElementById('sumToggleBtn').textContent = v ? '集計を非表示にする' : '集計を表示する';
-  if(save){ try{ localStorage.setItem(SUMVIS_KEY, v ? '1' : '0'); }catch(e){} }
+/* ---------- 月間集計の表示・非表示（PIN必須） ---------- */
+function setSummaryVisible(v){
+  document.getElementById('sumWrap').style.display = v ? 'block' : 'none';
+  const b = document.getElementById('sumToggleBtn');
+  b.textContent = v ? '非表示にする' : '表示する（PIN入力）';
+  b.className = v ? 'btn-ghost' : 'btn-in';
 }
-function toggleSummary(){ setSummaryVisible(document.getElementById('sumWrap').style.display === 'none', true); }
+function toggleSummary(){
+  if(document.getElementById('sumWrap').style.display !== 'none'){ setSummaryVisible(false); return; }
+  openPin(getPinHash() ? 'verify' : 'setup', () => setSummaryVisible(true));
+}
 
 function showModal(title, body, onConfirm, confirmLabel){
   document.getElementById('modalTitle').textContent = title;
@@ -1707,7 +1713,7 @@ populatePastStaffSelect();
 document.getElementById('pastDate').max = todayKey();
 document.getElementById('pastDate').value = todayKey();
 loadPastRecord();
-{ let v = '1'; try{ v = localStorage.getItem(SUMVIS_KEY) || '1'; }catch(e){} setSummaryVisible(v !== '0', false); }
+setSummaryVisible(false);
 { const p = loadScanPref(); if(p.facing) scanFacing = p.facing; if(p.on) startScan(true); }
 setInterval(()=>{ document.getElementById('todayLabel').textContent = new Date().toLocaleString('ja-JP'); }, 1000);
 </script>
